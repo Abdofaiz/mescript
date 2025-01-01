@@ -1198,4 +1198,47 @@ ufw allow 8080/tcp
 ufw allow 1194/tcp
 ufw allow 1194/udp
 ufw allow 2200/udp     # OpenVPN UDP port
+ufw allow 80/udp
+ufw allow 7100:7300/udp  # BadVPN ports
 echo "y" | ufw enable 
+
+# Configure HTTP Custom Support
+cat > /etc/systemd/system/http-custom.service <<EOF
+[Unit]
+Description=HTTP Custom Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 -m http.server 80
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Start HTTP Custom service
+systemctl daemon-reload
+systemctl enable http-custom
+systemctl start http-custom
+
+# Configure Nginx for HTTP Custom
+cat > /etc/nginx/conf.d/http-custom.conf <<EOF
+server {
+    listen 80;
+    server_name _;
+    
+    location / {
+        proxy_pass http://127.0.0.1:80;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$http_host;
+    }
+}
+EOF
+
+# Restart Nginx
+systemctl restart nginx 

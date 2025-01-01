@@ -786,6 +786,19 @@ create_ssh_udp() {
     # Get server IP
     server_ip=$(curl -s ipv4.icanhazip.com)
 
+    # Create HTTP Custom config
+    cat > /home/$username-http.txt <<EOF
+# HTTP Custom Configuration
+Host: $server_ip
+Port: 22
+UDP Port: $udp_range
+Username: $username
+Password: $password
+ProxyIP: $server_ip
+ProxyPort: 80
+Payload: GET / HTTP/1.1[crlf]Host: $server_ip[crlf]Upgrade: websocket[crlf][crlf]
+EOF
+
     clear
     echo -e "${GREEN}SSH UDP Account Created Successfully${NC}"
     echo -e "Username: $username"
@@ -795,6 +808,14 @@ create_ssh_udp() {
     echo -e "Server IP: $server_ip"
     echo -e "UDP Ports: $udp_range"
     echo -e "Badvpn Ports: 7100, 7200, 7300"
+    echo -e "\nHTTP Custom Settings:"
+    echo -e "Host: $server_ip"
+    echo -e "Port: 22"
+    echo -e "UDP Port: $udp_range"
+    echo -e "Proxy IP: $server_ip"
+    echo -e "Proxy Port: 80"
+    echo -e "Payload: GET / HTTP/1.1[crlf]Host: $server_ip[crlf]Upgrade: websocket[crlf][crlf]"
+    echo -e "\nConfig file saved as: /home/$username-http.txt"
 }
 
 # Function to delete SSH UDP account
