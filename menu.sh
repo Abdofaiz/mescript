@@ -18,6 +18,133 @@ generate_uuid() {
     uuidgen
 }
 
+# Function to create SSH & OpenVPN account
+create_ssh_ovpn() {
+    clear
+    echo -e "${GREEN}=== Create SSH & OpenVPN Account ===${NC}"
+    read -p "Username: " username
+    read -p "Password: " password
+    read -p "Duration (days): " duration
+
+    # Check if user exists
+    if id "$username" &>/dev/null; then
+        echo -e "${RED}Error: User already exists${NC}"
+        read -n 1 -s -r -p "Press any key to continue"
+        return 1
+    fi
+
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
+    
+    # Create user
+    useradd -e $(date -d "$exp_date" +"%Y-%m-%d") -s /bin/false -M "$username"
+    echo "$username:$password" | chpasswd
+
+    # Add to database
+    echo "ssh:${username}:${password}:${exp_date}" >> $USER_DB
+
+    # Get server IP
+    server_ip=$(curl -s ipv4.icanhazip.com)
+
+    clear
+    echo -e "${GREEN}Account Created Successfully${NC}"
+    echo -e "Username: $username"
+    echo -e "Password: $password"
+    echo -e "Expired Date: $exp_date"
+    echo -e "\nConnection Details:"
+    echo -e "SSH Port: 22, 109, 143"
+    echo -e "SSL/TLS Port: 443, 445, 777"
+    echo -e "Squid Proxy: 3128, 8080"
+    echo -e "OpenVPN TCP: 1194"
+    echo -e "Server IP: $server_ip"
+    echo -e "\nDownload OpenVPN Config: http://$server_ip:81/client-tcp.ovpn"
+    
+    read -n 1 -s -r -p "Press any key to continue"
+}
+
+# Function to delete SSH & OpenVPN account
+delete_ssh_ovpn() {
+    clear
+    echo -e "${GREEN}=== Delete SSH & OpenVPN Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^ssh:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to delete: " username
+
+    # Check if user exists
+    if ! grep -q "^ssh:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        read -n 1 -s -r -p "Press any key to continue"
+        return 1
+    fi
+
+    # Delete user
+    userdel -f "$username"
+    sed -i "/^ssh:$username:/d" $USER_DB
+
+    echo -e "${GREEN}User deleted successfully${NC}"
+    read -n 1 -s -r -p "Press any key to continue"
+}
+
+# Function to extend SSH & OpenVPN account
+extend_ssh_ovpn() {
+    clear
+    echo -e "${GREEN}=== Extend SSH & OpenVPN Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^ssh:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to extend: " username
+    read -p "Additional days: " days
+
+    # Check if user exists
+    if ! grep -q "^ssh:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        read -n 1 -s -r -p "Press any key to continue"
+        return 1
+    fi
+
+    # Calculate new expiry date
+    current_exp=$(grep "^ssh:$username:" $USER_DB | cut -d: -f4)
+    new_exp=$(date -d "$current_exp + $days days" +"%Y-%m-%d")
+    
+    # Update system
+    chage -E $(date -d "$new_exp" +"%Y-%m-%d") "$username"
+    
+    # Update database
+    sed -i "s|^ssh:$username:.*|ssh:$username:$(grep "^ssh:$username:" $USER_DB | cut -d: -f3):$new_exp|" $USER_DB
+
+    echo -e "${GREEN}Account extended successfully${NC}"
+    echo -e "New expiry date: $new_exp"
+    read -n 1 -s -r -p "Press any key to continue"
+}
+
+# Function to check SSH & OpenVPN users
+check_ssh_ovpn() {
+    clear
+    echo -e "${GREEN}=== SSH & OpenVPN User Status ===${NC}"
+    echo -e "\nOnline Users:"
+    echo -e "${YELLOW}"
+    who | grep -v "root"
+    echo -e "${NC}"
+    echo -e "\nUser List:"
+    echo -e "Username | Expiry Date | Status"
+    echo -e "--------------------------------"
+    while IFS=: read -r type username _ expiry; do
+        if [[ "$type" == "ssh" ]]; then
+            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                status="${GREEN}Active${NC}"
+            else
+                status="${RED}Expired${NC}"
+            fi
+            echo -e "$username | $expiry | $status"
+        fi
+    done < $USER_DB
+    
+    read -n 1 -s -r -p "Press any key to continue"
+}
+
 # Main menu
 while true; do
     clear
@@ -61,10 +188,10 @@ while true; do
     read -p "Select menu: " choice
 
     case $choice in
-        1) echo "Creating SSH & OpenVPN Account..." ;;
-        2) echo "Deleting SSH & OpenVPN Account..." ;;
-        3) echo "Extending SSH & OpenVPN Account..." ;;
-        4) echo "Checking SSH & OpenVPN Users..." ;;
+        1) create_ssh_ovpn ;;
+        2) delete_ssh_ovpn ;;
+        3) extend_ssh_ovpn ;;
+        4) check_ssh_ovpn ;;
         5) echo "Creating VMess Account..." ;;
         6) echo "Deleting VMess Account..." ;;
         7) echo "Extending VMess Account..." ;;
