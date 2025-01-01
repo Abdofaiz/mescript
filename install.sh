@@ -67,12 +67,88 @@ download_scripts() {
     mkdir -p /etc/vps
     mkdir -p /usr/local/bin
     
-    # Download menu script
-    wget -O /usr/local/bin/menu "https://raw.githubusercontent.com/yourusername/yourrepo/main/menu.sh"
+    # Create menu script
+    cat > /usr/local/bin/menu.sh <<'EOF'
+#!/bin/bash
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Configuration files
+XRAY_CONFIG="/usr/local/etc/xray/config.json"
+USER_DB="/etc/vps/users.db"
+
+# Function to generate random UUID
+generate_uuid() {
+    uuidgen
+}
+
+# Main menu
+while true; do
+    clear
+    echo -e "${GREEN}=== VPS Management Menu ===${NC}"
+    echo -e "${YELLOW}SSH Management${NC}"
+    echo -e "1) Add SSH User"
+    echo -e "2) Delete SSH User"
+    echo -e "3) List SSH Users"
+    echo -e "4) Show Online SSH Users"
+    echo -e ""
+    echo -e "${YELLOW}Xray Management${NC}"
+    echo -e "5) Add VMess User"
+    echo -e "6) Add VLESS User"
+    echo -e "7) Delete User"
+    echo -e "8) List All Users"
+    echo -e ""
+    echo -e "${YELLOW}WebSocket Management${NC}"
+    echo -e "9) Add VMess WebSocket User"
+    echo -e "10) Add VLESS WebSocket User"
+    echo -e "11) Add SSH WebSocket User"
+    echo -e ""
+    echo -e "${YELLOW}System${NC}"
+    echo -e "12) Show System Status"
+    echo -e "13) Exit"
+    echo -e ""
+    read -p "Select an option: " choice
+
+    case $choice in
+        1) echo "Add SSH User" ;;
+        2) echo "Delete SSH User" ;;
+        3) echo "List SSH Users" ;;
+        4) echo "Show Online SSH Users" ;;
+        5) echo "Add VMess User" ;;
+        6) echo "Add VLESS User" ;;
+        7) echo "Delete User" ;;
+        8) echo "List All Users" ;;
+        9) echo "Add VMess WebSocket User" ;;
+        10) echo "Add VLESS WebSocket User" ;;
+        11) echo "Add SSH WebSocket User" ;;
+        12) 
+            clear
+            echo -e "${GREEN}=== System Status ===${NC}"
+            echo -e "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%"
+            echo -e "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')"
+            echo -e "Disk Usage: $(df -h / | awk 'NR==2{print $5}')"
+            echo ""
+            read -n 1 -s -r -p "Press any key to continue"
+            ;;
+        13) exit 0 ;;
+        *) echo -e "${RED}Invalid option${NC}" ;;
+    esac
+done
+EOF
+
+    # Make menu script executable
+    chmod +x /usr/local/bin/menu.sh
+
+    # Create menu command
+    cat > /usr/local/bin/menu <<'EOF'
+#!/bin/bash
+bash /usr/local/bin/menu.sh
+EOF
     chmod +x /usr/local/bin/menu
-    
-    # Download other required files
-    # Add your repository URLs here
 }
 
 # Configure services
@@ -252,13 +328,6 @@ EOF
     systemctl restart squid
     systemctl restart xray
     systemctl start ws-ssh
-
-    # Create menu command
-    cat > /usr/local/bin/menu <<EOF
-#!/bin/bash
-bash /usr/local/bin/menu.sh
-EOF
-    chmod +x /usr/local/bin/menu
 
     # Initialize user database
     touch /etc/vps/users.db
