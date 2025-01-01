@@ -79,8 +79,189 @@ download_scripts() {
 configure_services() {
     echo -e "${GREEN}Configuring services...${NC}"
     
-    # Run the configuration commands from install_vps.sh
-    # Add your configuration commands here
+    # Create necessary directories
+    mkdir -p /etc/vps
+    mkdir -p /etc/openvpn/easy-rsa
+    mkdir -p /etc/openvpn/client-configs
+    mkdir -p /usr/local/etc/xray
+    
+    # Install Xray
+    echo -e "${GREEN}Installing Xray...${NC}"
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+
+    # Configure Stunnel
+    echo -e "${GREEN}Configuring Stunnel...${NC}"
+    cat > /etc/stunnel/stunnel.conf <<EOF
+pid = /var/run/stunnel.pid
+cert = /etc/stunnel/stunnel.pem
+client = no
+socket = a:SO_REUSEADDR=1
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+
+[dropbear]
+accept = 443
+connect = 127.0.0.1:22
+
+[dropbear]
+accept = 445
+connect = 127.0.0.1:22
+
+[dropbear]
+accept = 777
+connect = 127.0.0.1:22
+EOF
+
+    # Generate SSL certificate
+    openssl genrsa -out /etc/stunnel/stunnel.key 2048
+    openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=Organization/OU=Unit/CN=domain.com"
+    openssl x509 -req -days 365 -in /etc/stunnel/stunnel.csr -signkey /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt
+    cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
+
+    # Configure Dropbear
+    echo -e "${GREEN}Configuring Dropbear...${NC}"
+    sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
+    sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=443/g' /etc/default/dropbear
+    echo "DROPBEAR_EXTRA_ARGS=\"-p 109 -p 143\"" >> /etc/default/dropbear
+
+    # Configure Squid
+    echo -e "${GREEN}Configuring Squid...${NC}"
+    cat > /etc/squid/squid.conf <<EOF
+http_port 3128
+http_port 8080
+acl localhost src 127.0.0.1/32
+acl to_localhost dst 127.0.0.0/8
+acl SSL_ports port 443
+acl Safe_ports port 80
+acl Safe_ports port 21
+acl Safe_ports port 443
+acl Safe_ports port 70
+acl Safe_ports port 210
+acl Safe_ports port 1025-65535
+acl Safe_ports port 280
+acl Safe_ports port 488
+acl Safe_ports port 591
+acl Safe_ports port 777
+acl CONNECT method CONNECT
+http_access allow localhost
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow all
+EOF
+
+    # Configure Xray
+    cat > /usr/local/etc/xray/config.json <<EOF
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "port": 8443,
+      "protocol": "vmess",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/stunnel/stunnel.crt",
+              "keyFile": "/etc/stunnel/stunnel.key"
+            }
+          ]
+        },
+        "wsSettings": {
+          "path": "/vmess",
+          "headers": {}
+        }
+      }
+    },
+    {
+      "port": 8442,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/stunnel/stunnel.crt",
+              "keyFile": "/etc/stunnel/stunnel.key"
+            }
+          ]
+        },
+        "wsSettings": {
+          "path": "/vless",
+          "headers": {}
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom"
+    }
+  ]
+}
+EOF
+
+    # Configure WebSocket SSH
+    cat > /usr/local/bin/ws-ssh.py <<EOF
+#!/usr/bin/env python3
+import socket, threading, thread, select, signal, sys, time, getopt
+
+# Listen
+LISTENING_ADDR = '127.0.0.1'
+LISTENING_PORT = 2082
+...(WebSocket SSH Python script content)...
+EOF
+    chmod +x /usr/local/bin/ws-ssh.py
+
+    # Create WebSocket SSH service
+    cat > /etc/systemd/system/ws-ssh.service <<EOF
+[Unit]
+Description=WebSocket SSH Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/ws-ssh.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Enable and start services
+    systemctl daemon-reload
+    systemctl enable stunnel4
+    systemctl enable dropbear
+    systemctl enable squid
+    systemctl enable xray
+    systemctl enable ws-ssh
+
+    systemctl restart stunnel4
+    systemctl restart dropbear
+    systemctl restart squid
+    systemctl restart xray
+    systemctl start ws-ssh
+
+    # Create menu command
+    cat > /usr/local/bin/menu <<EOF
+#!/bin/bash
+bash /usr/local/bin/menu.sh
+EOF
+    chmod +x /usr/local/bin/menu
+
+    # Initialize user database
+    touch /etc/vps/users.db
 }
 
 # Main installation
