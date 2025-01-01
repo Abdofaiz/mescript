@@ -13,9 +13,19 @@ NC='\033[0m'
 XRAY_CONFIG="/usr/local/etc/xray/config.json"
 USER_DB="/etc/vps/users.db"
 
+# Create user database if it doesn't exist
+[ ! -f "$USER_DB" ] && touch "$USER_DB"
+
 # Function to generate random UUID
 generate_uuid() {
     uuidgen
+}
+
+# Function to wait for user input
+press_enter() {
+    echo ""
+    echo -e "${YELLOW}Press enter to return to the main menu...${NC}"
+    read
 }
 
 # Function to create SSH & OpenVPN account
@@ -29,7 +39,6 @@ create_ssh_ovpn() {
     # Check if user exists
     if id "$username" &>/dev/null; then
         echo -e "${RED}Error: User already exists${NC}"
-        read -n 1 -s -r -p "Press any key to continue"
         return 1
     fi
 
@@ -58,8 +67,6 @@ create_ssh_ovpn() {
     echo -e "OpenVPN TCP: 1194"
     echo -e "Server IP: $server_ip"
     echo -e "\nDownload OpenVPN Config: http://$server_ip:81/client-tcp.ovpn"
-    
-    read -n 1 -s -r -p "Press any key to continue"
 }
 
 # Function to delete SSH & OpenVPN account
@@ -145,14 +152,7 @@ check_ssh_ovpn() {
     read -n 1 -s -r -p "Press any key to continue"
 }
 
-# Add this function at the beginning of the script
-press_enter() {
-    echo ""
-    echo -e "${YELLOW}Press enter to return to the main menu...${NC}"
-    read
-}
-
-# Main menu
+# Main menu loop
 while true; do
     clear
     echo -e "${GREEN}╔═══════════════════════════════════════════════╗${NC}"
@@ -192,7 +192,7 @@ while true; do
     echo -e "${CYAN}[22]${NC} • Reboot VPS"
     echo -e "${CYAN}[23]${NC} • Exit"
     echo -e ""
-    read -p "Select menu: " choice
+    read -p "Select menu [1-23]: " choice
 
     case $choice in
         1) 
@@ -212,59 +212,59 @@ while true; do
             press_enter
             ;;
         5) 
-            echo "Creating VMess Account..."
+            create_vmess
             press_enter
             ;;
         6) 
-            echo "Deleting VMess Account..."
+            delete_vmess
             press_enter
             ;;
         7) 
-            echo "Extending VMess Account..."
+            extend_vmess
             press_enter
             ;;
         8) 
-            echo "Checking VMess Users..."
+            check_vmess
             press_enter
             ;;
         9) 
-            echo "Creating VLess Account..."
+            create_vless
             press_enter
             ;;
         10) 
-            echo "Deleting VLess Account..."
+            delete_vless
             press_enter
             ;;
         11) 
-            echo "Extending VLess Account..."
+            extend_vless
             press_enter
             ;;
         12) 
-            echo "Checking VLess Users..."
+            check_vless
             press_enter
             ;;
         13) 
-            echo "Creating WebSocket Account..."
+            create_ws
             press_enter
             ;;
         14) 
-            echo "Deleting WebSocket Account..."
+            delete_ws
             press_enter
             ;;
         15) 
-            echo "Extending WebSocket Account..."
+            extend_ws
             press_enter
             ;;
         16) 
-            echo "Checking WebSocket Users..."
+            check_ws
             press_enter
             ;;
         17) 
-            echo "Adding/Changing Domain..."
+            change_domain
             press_enter
             ;;
         18) 
-            echo "Changing Port Services..."
+            change_ports
             press_enter
             ;;
         19) 
@@ -273,7 +273,6 @@ while true; do
             echo -e "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%"
             echo -e "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')"
             echo -e "Disk Usage: $(df -h / | awk 'NR==2{print $5}')"
-            echo ""
             press_enter
             ;;
         20)
@@ -285,14 +284,12 @@ while true; do
             echo -e "OpenVPN: $(systemctl is-active openvpn)"
             echo -e "Xray: $(systemctl is-active xray)"
             echo -e "WebSocket: $(systemctl is-active ws-ssh)"
-            echo ""
             press_enter
             ;;
         21)
             clear
             echo -e "${GREEN}=== Memory Usage ===${NC}"
             free -h
-            echo ""
             press_enter
             ;;
         22)
@@ -302,9 +299,12 @@ while true; do
             fi
             press_enter
             ;;
-        23) exit 0 ;;
-        *) 
-            echo -e "${RED}Invalid option${NC}"
+        23) 
+            clear
+            exit 0 
+            ;;
+        *)
+            echo -e "${RED}Please enter a number between 1 and 23${NC}"
             press_enter
             ;;
     esac
