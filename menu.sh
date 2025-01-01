@@ -152,6 +152,149 @@ check_ssh_ovpn() {
     read -n 1 -s -r -p "Press any key to continue"
 }
 
+# Function to create VMess account
+create_vmess() {
+    clear
+    echo -e "${GREEN}=== Create VMess Account ===${NC}"
+    read -p "Username: " username
+    read -p "Duration (days): " duration
+
+    # Check if user exists
+    if grep -q "^vmess:$username:" $USER_DB; then
+        echo -e "${RED}Error: User already exists${NC}"
+        return 1
+    fi
+
+    # Generate UUID
+    uuid=$(generate_uuid)
+    
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
+    
+    # Add to Xray config
+    jq --arg uuid "$uuid" '.inbounds[0].settings.clients += [{"id": $uuid, "alterId": 0}]' $XRAY_CONFIG > tmp.json
+    mv tmp.json $XRAY_CONFIG
+    
+    # Add to database
+    echo "vmess:${username}:${uuid}:${exp_date}" >> $USER_DB
+    
+    # Get server IP
+    server_ip=$(curl -s ipv4.icanhazip.com)
+    
+    # Restart Xray service
+    systemctl restart xray
+    
+    # Create VMess URL
+    vmess_json="{
+      \"v\": \"2\",
+      \"ps\": \"${username}\",
+      \"add\": \"${server_ip}\",
+      \"port\": \"8443\",
+      \"id\": \"${uuid}\",
+      \"aid\": \"0\",
+      \"net\": \"ws\",
+      \"path\": \"/vmess\",
+      \"type\": \"none\",
+      \"host\": \"\",
+      \"tls\": \"tls\"
+    }"
+    vmess_url="vmess://$(echo $vmess_json | base64 -w 0)"
+    
+    clear
+    echo -e "${GREEN}VMess Account Created Successfully${NC}"
+    echo -e "Username: $username"
+    echo -e "UUID: $uuid"
+    echo -e "Expired Date: $exp_date"
+    echo -e "\nConnection Details:"
+    echo -e "Address: $server_ip"
+    echo -e "Port: 8443"
+    echo -e "Protocol: VMess"
+    echo -e "Path: /vmess"
+    echo -e "TLS: Yes"
+    echo -e "\nVMess URL:"
+    echo -e "$vmess_url"
+}
+
+# Function to delete VMess account
+delete_vmess() {
+    clear
+    echo -e "${GREEN}=== Delete VMess Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^vmess:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to delete: " username
+
+    # Check if user exists
+    if ! grep -q "^vmess:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Get UUID
+    uuid=$(grep "^vmess:$username:" $USER_DB | cut -d: -f3)
+    
+    # Remove from Xray config
+    jq --arg uuid "$uuid" '.inbounds[0].settings.clients = [.inbounds[0].settings.clients[] | select(.id != $uuid)]' $XRAY_CONFIG > tmp.json
+    mv tmp.json $XRAY_CONFIG
+    
+    # Remove from database
+    sed -i "/^vmess:$username:/d" $USER_DB
+    
+    # Restart Xray service
+    systemctl restart xray
+    
+    echo -e "${GREEN}VMess account deleted successfully${NC}"
+}
+
+# Function to extend VMess account
+extend_vmess() {
+    clear
+    echo -e "${GREEN}=== Extend VMess Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^vmess:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to extend: " username
+    read -p "Additional days: " days
+
+    # Check if user exists
+    if ! grep -q "^vmess:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Calculate new expiry date
+    current_exp=$(grep "^vmess:$username:" $USER_DB | cut -d: -f4)
+    new_exp=$(date -d "$current_exp + $days days" +"%Y-%m-%d")
+    
+    # Update database
+    uuid=$(grep "^vmess:$username:" $USER_DB | cut -d: -f3)
+    sed -i "s|^vmess:$username:.*|vmess:$username:$uuid:$new_exp|" $USER_DB
+    
+    echo -e "${GREEN}Account extended successfully${NC}"
+    echo -e "New expiry date: $new_exp"
+}
+
+# Function to check VMess users
+check_vmess() {
+    clear
+    echo -e "${GREEN}=== VMess User Status ===${NC}"
+    echo -e "\nUser List:"
+    echo -e "Username | UUID | Expiry Date | Status"
+    echo -e "----------------------------------------"
+    while IFS=: read -r type username uuid expiry; do
+        if [[ "$type" == "vmess" ]]; then
+            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                status="${GREEN}Active${NC}"
+            else
+                status="${RED}Expired${NC}"
+            fi
+            echo -e "$username | $uuid | $expiry | $status"
+        fi
+    done < $USER_DB
+}
+
 # Main menu loop
 while true; do
     clear
