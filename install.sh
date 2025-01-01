@@ -168,6 +168,114 @@ EOF
     ufw allow 1194/tcp
     ufw allow 1194/udp
     echo "y" | ufw enable
+
+    # Configure WebSocket Service
+    cat > /usr/local/bin/ws-ssh.py <<'EOF'
+#!/usr/bin/env python3
+import socket
+import threading
+import select
+import sys
+import time
+import getopt
+
+LISTENING_ADDR = '0.0.0.0'
+LISTENING_PORT = 80
+PASS = ''
+
+BUFLEN = 4096 * 4
+TIMEOUT = 60
+DEFAULT_HOST = '127.0.0.1:22'
+RESPONSE = 'HTTP/1.1 101 WebSocket Protocol Handshake\r\n\r\n'
+
+class Server(threading.Thread):
+    def __init__(self, host, port):
+        threading.Thread.__init__(self)
+        self.running = False
+        self.host = host
+        self.port = port
+        self.threads = []
+        self.threadsLock = threading.Lock()
+        self.logLock = threading.Lock()
+
+    def run(self):
+        self.soc = socket.socket(socket.AF_INET)
+        self.soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.soc.settimeout(2)
+        self.soc.bind((self.host, self.port))
+        self.soc.listen(0)
+        self.running = True
+
+        try:
+            while self.running:
+                try:
+                    c, addr = self.soc.accept()
+                    c.setblocking(1)
+                    conn = ConnectionHandler(c, self, addr)
+                    conn.start()
+                    self.addConn(conn)
+                except socket.timeout:
+                    continue
+        except Exception as e:
+            print('Exception:', e)
+
+        self.running = False
+        self.soc.close()
+
+    def addConn(self, conn):
+        try:
+            self.threadsLock.acquire()
+            if self.running:
+                self.threads.append(conn)
+        finally:
+            self.threadsLock.release()
+
+    def removeConn(self, conn):
+        try:
+            self.threadsLock.acquire()
+            self.threads.remove(conn)
+        finally:
+            self.threadsLock.release()
+
+def main():
+    print('Starting WebSocket Server...')
+    server = Server(LISTENING_ADDR, LISTENING_PORT)
+    server.start()
+    while True:
+        try:
+            time.sleep(2)
+        except KeyboardInterrupt:
+            print('Stopping...')
+            server.running = False
+            server.join()
+            break
+
+if __name__ == '__main__':
+    main()
+EOF
+
+    chmod +x /usr/local/bin/ws-ssh.py
+
+    # Create WebSocket service
+    cat > /etc/systemd/system/ws-ssh.service <<EOF
+[Unit]
+Description=WebSocket SSH Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /usr/local/bin/ws-ssh.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable ws-ssh
+    systemctl start ws-ssh
 }
 
 # Function to install menu script

@@ -295,6 +295,449 @@ check_vmess() {
     done < $USER_DB
 }
 
+# Function to create VLESS account
+create_vless() {
+    clear
+    echo -e "${GREEN}=== Create VLESS Account ===${NC}"
+    read -p "Username: " username
+    read -p "Duration (days): " duration
+
+    # Check if user exists
+    if grep -q "^vless:$username:" $USER_DB; then
+        echo -e "${RED}Error: User already exists${NC}"
+        return 1
+    fi
+
+    # Generate UUID
+    uuid=$(generate_uuid)
+    
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
+    
+    # Add to Xray config
+    jq --arg uuid "$uuid" '.inbounds[1].settings.clients += [{"id": $uuid, "flow": "xtls-rprx-direct"}]' $XRAY_CONFIG > tmp.json
+    mv tmp.json $XRAY_CONFIG
+    
+    # Add to database
+    echo "vless:${username}:${uuid}:${exp_date}" >> $USER_DB
+    
+    # Get server IP
+    server_ip=$(curl -s ipv4.icanhazip.com)
+    
+    # Restart Xray service
+    systemctl restart xray
+    
+    clear
+    echo -e "${GREEN}VLESS Account Created Successfully${NC}"
+    echo -e "Username: $username"
+    echo -e "UUID: $uuid"
+    echo -e "Expired Date: $exp_date"
+    echo -e "\nConnection Details:"
+    echo -e "Address: $server_ip"
+    echo -e "Port: 8442"
+    echo -e "Protocol: VLESS"
+    echo -e "Path: /vless"
+    echo -e "TLS: Yes"
+    echo -e "\nVLESS URL:"
+    echo -e "vless://${uuid}@${server_ip}:8442?security=tls&encryption=none&headerType=none&type=tcp&flow=xtls-rprx-direct#${username}"
+}
+
+# Function to delete VLESS account
+delete_vless() {
+    clear
+    echo -e "${GREEN}=== Delete VLESS Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^vless:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to delete: " username
+
+    # Check if user exists
+    if ! grep -q "^vless:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Get UUID
+    uuid=$(grep "^vless:$username:" $USER_DB | cut -d: -f3)
+    
+    # Remove from Xray config
+    jq --arg uuid "$uuid" '.inbounds[1].settings.clients = [.inbounds[1].settings.clients[] | select(.id != $uuid)]' $XRAY_CONFIG > tmp.json
+    mv tmp.json $XRAY_CONFIG
+    
+    # Remove from database
+    sed -i "/^vless:$username:/d" $USER_DB
+    
+    # Restart Xray service
+    systemctl restart xray
+    
+    echo -e "${GREEN}VLESS account deleted successfully${NC}"
+}
+
+# Function to extend VLESS account
+extend_vless() {
+    clear
+    echo -e "${GREEN}=== Extend VLESS Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^vless:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to extend: " username
+    read -p "Additional days: " days
+
+    # Check if user exists
+    if ! grep -q "^vless:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Calculate new expiry date
+    current_exp=$(grep "^vless:$username:" $USER_DB | cut -d: -f4)
+    new_exp=$(date -d "$current_exp + $days days" +"%Y-%m-%d")
+    
+    # Update database
+    uuid=$(grep "^vless:$username:" $USER_DB | cut -d: -f3)
+    sed -i "s|^vless:$username:.*|vless:$username:$uuid:$new_exp|" $USER_DB
+    
+    echo -e "${GREEN}Account extended successfully${NC}"
+    echo -e "New expiry date: $new_exp"
+}
+
+# Function to check VLESS users
+check_vless() {
+    clear
+    echo -e "${GREEN}=== VLESS User Status ===${NC}"
+    echo -e "\nUser List:"
+    echo -e "Username | UUID | Expiry Date | Status"
+    echo -e "----------------------------------------"
+    while IFS=: read -r type username uuid expiry; do
+        if [[ "$type" == "vless" ]]; then
+            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                status="${GREEN}Active${NC}"
+            else
+                status="${RED}Expired${NC}"
+            fi
+            echo -e "$username | $uuid | $expiry | $status"
+        fi
+    done < $USER_DB
+}
+
+# Function to create WebSocket account
+create_ws() {
+    clear
+    echo -e "${GREEN}=== Create WebSocket Account ===${NC}"
+    read -p "Username: " username
+    read -p "Password: " password
+    read -p "Duration (days): " duration
+
+    # Check if user exists
+    if grep -q "^ws:$username:" $USER_DB; then
+        echo -e "${RED}Error: User already exists${NC}"
+        return 1
+    fi
+
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
+    
+    # Create system user
+    useradd -e $(date -d "$exp_date" +"%Y-%m-%d") -s /bin/false -M "$username"
+    echo "$username:$password" | chpasswd
+
+    # Add to database
+    echo "ws:${username}:${password}:${exp_date}" >> $USER_DB
+    
+    # Get server IP
+    server_ip=$(curl -s ipv4.icanhazip.com)
+    
+    clear
+    echo -e "${GREEN}WebSocket Account Created Successfully${NC}"
+    echo -e "Username: $username"
+    echo -e "Password: $password"
+    echo -e "Expired Date: $exp_date"
+    echo -e "\nConnection Details:"
+    echo -e "Address: $server_ip"
+    echo -e "Port: 80"
+    echo -e "Path: /ws"
+    echo -e "\nWebSocket Config:"
+    echo -e "URL: ws://$server_ip:80/ws"
+    echo -e "Header:"
+    echo -e "Host: $server_ip"
+    echo -e "Upgrade: websocket"
+    echo -e "Connection: Upgrade"
+    echo -e "User-Agent: [ua]"
+}
+
+# Function to delete WebSocket account
+delete_ws() {
+    clear
+    echo -e "${GREEN}=== Delete WebSocket Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^ws:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to delete: " username
+
+    # Check if user exists
+    if ! grep -q "^ws:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Delete system user
+    userdel -f "$username"
+    
+    # Remove from database
+    sed -i "/^ws:$username:/d" $USER_DB
+    
+    echo -e "${GREEN}WebSocket account deleted successfully${NC}"
+}
+
+# Function to extend WebSocket account
+extend_ws() {
+    clear
+    echo -e "${GREEN}=== Extend WebSocket Account ===${NC}"
+    echo -e "Current users:"
+    echo -e "${YELLOW}"
+    grep "^ws:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to extend: " username
+    read -p "Additional days: " days
+
+    # Check if user exists
+    if ! grep -q "^ws:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Calculate new expiry date
+    current_exp=$(grep "^ws:$username:" $USER_DB | cut -d: -f4)
+    new_exp=$(date -d "$current_exp + $days days" +"%Y-%m-%d")
+    
+    # Update system
+    chage -E $(date -d "$new_exp" +"%Y-%m-%d") "$username"
+    
+    # Update database
+    password=$(grep "^ws:$username:" $USER_DB | cut -d: -f3)
+    sed -i "s|^ws:$username:.*|ws:$username:$password:$new_exp|" $USER_DB
+    
+    echo -e "${GREEN}Account extended successfully${NC}"
+    echo -e "New expiry date: $new_exp"
+}
+
+# Function to check WebSocket users
+check_ws() {
+    clear
+    echo -e "${GREEN}=== WebSocket User Status ===${NC}"
+    echo -e "\nUser List:"
+    echo -e "Username | Expiry Date | Status"
+    echo -e "--------------------------------"
+    while IFS=: read -r type username _ expiry; do
+        if [[ "$type" == "ws" ]]; then
+            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                status="${GREEN}Active${NC}"
+            else
+                status="${RED}Expired${NC}"
+            fi
+            echo -e "$username | $expiry | $status"
+        fi
+    done < $USER_DB
+    
+    echo -e "\nOnline Users:"
+    echo -e "${YELLOW}"
+    netstat -anp | grep ESTABLISHED | grep python3 | awk '{print $5}' | cut -d: -f1 | sort | uniq
+    echo -e "${NC}"
+}
+
+# Function to change domain
+change_domain() {
+    clear
+    echo -e "${GREEN}=== Add/Change Domain ===${NC}"
+    echo -e "Current domain settings:"
+    if [ -f "/etc/vps/domain.conf" ]; then
+        current_domain=$(cat /etc/vps/domain.conf)
+        echo -e "Current domain: ${YELLOW}$current_domain${NC}"
+    else
+        echo -e "${RED}No domain configured${NC}"
+    fi
+    
+    echo -e "\n${YELLOW}Options:${NC}"
+    echo -e "1) Add/Change domain"
+    echo -e "2) Use IP address"
+    echo -e "3) Back to menu"
+    
+    read -p "Select option: " domain_option
+    
+    case $domain_option in
+        1)
+            read -p "Enter your domain: " new_domain
+            
+            # Save domain
+            echo "$new_domain" > /etc/vps/domain.conf
+            
+            # Update Nginx config
+            cat > /etc/nginx/conf.d/xray.conf <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $new_domain;
+    
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $new_domain;
+    
+    ssl_certificate /etc/letsencrypt/live/$new_domain/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$new_domain/privkey.pem;
+    ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+ECDSA+AES128:EECDH+aRSA+AES128:RSA+AES128:EECDH+ECDSA+AES256:EECDH+aRSA+AES256:RSA+AES256:EECDH+ECDSA+3DES:EECDH+aRSA+3DES:RSA+3DES:!MD5;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    
+    location / {
+        proxy_pass http://127.0.0.1:80;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$http_host;
+    }
+    
+    location /vmess {
+        proxy_pass http://127.0.0.1:8443;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$http_host;
+    }
+    
+    location /vless {
+        proxy_pass http://127.0.0.1:8442;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$http_host;
+    }
+}
+EOF
+            
+            # Get SSL certificate
+            systemctl stop nginx
+            certbot certonly --standalone --preferred-challenges http --agree-tos --email admin@$new_domain -d $new_domain
+            systemctl start nginx
+            
+            # Update Xray config
+            jq --arg domain "$new_domain" '.inbounds[0].streamSettings.tlsSettings.serverName = $domain | .inbounds[1].streamSettings.tlsSettings.serverName = $domain' $XRAY_CONFIG > tmp.json
+            mv tmp.json $XRAY_CONFIG
+            
+            # Restart services
+            systemctl restart nginx
+            systemctl restart xray
+            
+            echo -e "${GREEN}Domain has been updated to: $new_domain${NC}"
+            ;;
+        2)
+            server_ip=$(curl -s ipv4.icanhazip.com)
+            echo "$server_ip" > /etc/vps/domain.conf
+            
+            # Update configs to use IP
+            sed -i "s/server_name .*/server_name $server_ip;/g" /etc/nginx/conf.d/xray.conf
+            
+            echo -e "${GREEN}System will use IP address: $server_ip${NC}"
+            ;;
+        3)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            ;;
+    esac
+}
+
+# Function to change ports
+change_ports() {
+    clear
+    echo -e "${GREEN}=== Change Port Services ===${NC}"
+    echo -e "\nCurrent ports:"
+    echo -e "SSH: 22"
+    echo -e "Dropbear: 109, 143"
+    echo -e "Stunnel: 443, 445, 777"
+    echo -e "Squid: 3128, 8080"
+    echo -e "OpenVPN: 1194"
+    echo -e "Xray VMess: 8443"
+    echo -e "Xray VLESS: 8442"
+    echo -e "WebSocket: 80"
+    
+    echo -e "\n${YELLOW}Select service to change port:${NC}"
+    echo -e "1) SSH"
+    echo -e "2) Dropbear"
+    echo -e "3) Stunnel"
+    echo -e "4) Squid"
+    echo -e "5) OpenVPN"
+    echo -e "6) Xray VMess"
+    echo -e "7) Xray VLESS"
+    echo -e "8) WebSocket"
+    echo -e "9) Back to menu"
+    
+    read -p "Select option: " port_option
+    
+    case $port_option in
+        1)
+            read -p "Enter new SSH port: " new_port
+            sed -i "s/Port 22/Port $new_port/g" /etc/ssh/sshd_config
+            systemctl restart ssh
+            ;;
+        2)
+            read -p "Enter new Dropbear ports (space-separated): " new_ports
+            sed -i "s/DROPBEAR_EXTRA_ARGS=.*/DROPBEAR_EXTRA_ARGS=\"-p $new_ports\"/g" /etc/default/dropbear
+            systemctl restart dropbear
+            ;;
+        3)
+            read -p "Enter new Stunnel ports (space-separated): " new_ports
+            for port in $new_ports; do
+                sed -i "s/accept = .*/accept = $port/g" /etc/stunnel/stunnel.conf
+            done
+            systemctl restart stunnel4
+            ;;
+        4)
+            read -p "Enter new Squid ports (space-separated): " new_ports
+            sed -i "s/http_port .*/http_port $new_ports/g" /etc/squid/squid.conf
+            systemctl restart squid
+            ;;
+        5)
+            read -p "Enter new OpenVPN port: " new_port
+            sed -i "s/port .*/port $new_port/g" /etc/openvpn/server.conf
+            systemctl restart openvpn
+            ;;
+        6)
+            read -p "Enter new VMess port: " new_port
+            jq --arg port "$new_port" '.inbounds[0].port = ($port|tonumber)' $XRAY_CONFIG > tmp.json
+            mv tmp.json $XRAY_CONFIG
+            systemctl restart xray
+            ;;
+        7)
+            read -p "Enter new VLESS port: " new_port
+            jq --arg port "$new_port" '.inbounds[1].port = ($port|tonumber)' $XRAY_CONFIG > tmp.json
+            mv tmp.json $XRAY_CONFIG
+            systemctl restart xray
+            ;;
+        8)
+            read -p "Enter new WebSocket port: " new_port
+            sed -i "s/LISTENING_PORT = .*/LISTENING_PORT = $new_port/g" /usr/local/bin/ws-ssh.py
+            systemctl restart ws-ssh
+            ;;
+        9)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            ;;
+    esac
+    
+    echo -e "${GREEN}Port(s) updated successfully${NC}"
+}
+
 # Main menu loop
 while true; do
     clear
