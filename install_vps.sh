@@ -1155,4 +1155,47 @@ cat > /usr/local/etc/xray/config.json <<EOF
     ]
   }
 }
-EOF 
+EOF
+
+# Configure UDP ports for SSH
+iptables -t nat -A PREROUTING -p udp --dport 1:65535 -j REDIRECT --to-port 22
+iptables-save > /etc/iptables.rules
+
+# Create startup script for UDP ports
+cat > /etc/network/if-pre-up.d/iptables <<EOF
+#!/bin/sh
+iptables-restore < /etc/iptables.rules
+EOF
+chmod +x /etc/network/if-pre-up.d/iptables
+
+# Configure OpenVPN UDP
+if [[ -f /etc/openvpn/server.conf ]]; then
+    cp /etc/openvpn/server.conf /etc/openvpn/server-tcp.conf
+    cp /etc/openvpn/server.conf /etc/openvpn/server-udp.conf
+    
+    # Configure TCP
+    sed -i 's/proto udp/proto tcp/g' /etc/openvpn/server-tcp.conf
+    
+    # Configure UDP
+    sed -i 's/port 1194/port 2200/g' /etc/openvpn/server-udp.conf
+    
+    # Enable both services
+    systemctl enable openvpn@server-tcp
+    systemctl enable openvpn@server-udp
+    systemctl start openvpn@server-tcp
+    systemctl start openvpn@server-udp
+fi 
+
+# Configure UFW
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp
+ufw allow 1:65535/udp  # Allow all UDP ports
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 3128/tcp
+ufw allow 8080/tcp
+ufw allow 1194/tcp
+ufw allow 1194/udp
+ufw allow 2200/udp     # OpenVPN UDP port
+echo "y" | ufw enable 

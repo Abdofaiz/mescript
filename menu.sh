@@ -660,74 +660,90 @@ change_ports() {
     clear
     echo -e "${GREEN}=== Change Port Services ===${NC}"
     echo -e "\nCurrent ports:"
-    echo -e "SSH: 22"
+    echo -e "SSH: 22 (TCP/UDP)"
+    echo -e "SSH UDP: 1-65535"
     echo -e "Dropbear: 109, 143"
     echo -e "Stunnel: 443, 445, 777"
     echo -e "Squid: 3128, 8080"
-    echo -e "OpenVPN: 1194"
+    echo -e "OpenVPN: 1194 (TCP/UDP)"
     echo -e "Xray VMess: 8443"
     echo -e "Xray VLESS: 8442"
     echo -e "WebSocket: 80"
     
     echo -e "\n${YELLOW}Select service to change port:${NC}"
-    echo -e "1) SSH"
-    echo -e "2) Dropbear"
-    echo -e "3) Stunnel"
-    echo -e "4) Squid"
-    echo -e "5) OpenVPN"
-    echo -e "6) Xray VMess"
-    echo -e "7) Xray VLESS"
-    echo -e "8) WebSocket"
-    echo -e "9) Back to menu"
+    echo -e "1) SSH TCP"
+    echo -e "2) SSH UDP"
+    echo -e "3) Dropbear"
+    echo -e "4) Stunnel"
+    echo -e "5) Squid"
+    echo -e "6) OpenVPN TCP"
+    echo -e "7) OpenVPN UDP"
+    echo -e "8) Xray VMess"
+    echo -e "9) Xray VLESS"
+    echo -e "10) WebSocket"
+    echo -e "11) Back to menu"
     
     read -p "Select option: " port_option
     
     case $port_option in
         1)
-            read -p "Enter new SSH port: " new_port
+            read -p "Enter new SSH TCP port: " new_port
             sed -i "s/Port 22/Port $new_port/g" /etc/ssh/sshd_config
             systemctl restart ssh
             ;;
         2)
+            read -p "Enter UDP port range (example: 1-65535): " udp_range
+            # Configure UDP ports using iptables
+            iptables -t nat -A PREROUTING -p udp --dport $udp_range -j REDIRECT --to-port 22
+            # Save iptables rules
+            iptables-save > /etc/iptables.rules
+            # Create startup script for UDP ports
+            cat > /etc/network/if-pre-up.d/iptables <<EOF
+#!/bin/sh
+iptables-restore < /etc/iptables.rules
+EOF
+            chmod +x /etc/network/if-pre-up.d/iptables
+            ;;
+        3)
             read -p "Enter new Dropbear ports (space-separated): " new_ports
             sed -i "s/DROPBEAR_EXTRA_ARGS=.*/DROPBEAR_EXTRA_ARGS=\"-p $new_ports\"/g" /etc/default/dropbear
             systemctl restart dropbear
             ;;
-        3)
+        4)
             read -p "Enter new Stunnel ports (space-separated): " new_ports
             for port in $new_ports; do
                 sed -i "s/accept = .*/accept = $port/g" /etc/stunnel/stunnel.conf
             done
             systemctl restart stunnel4
             ;;
-        4)
+        5)
             read -p "Enter new Squid ports (space-separated): " new_ports
             sed -i "s/http_port .*/http_port $new_ports/g" /etc/squid/squid.conf
             systemctl restart squid
             ;;
-        5)
+        6)
             read -p "Enter new OpenVPN port: " new_port
             sed -i "s/port .*/port $new_port/g" /etc/openvpn/server.conf
             systemctl restart openvpn
             ;;
-        6)
+        7)
             read -p "Enter new VMess port: " new_port
             jq --arg port "$new_port" '.inbounds[0].port = ($port|tonumber)' $XRAY_CONFIG > tmp.json
             mv tmp.json $XRAY_CONFIG
             systemctl restart xray
             ;;
-        7)
+        8)
             read -p "Enter new VLESS port: " new_port
             jq --arg port "$new_port" '.inbounds[1].port = ($port|tonumber)' $XRAY_CONFIG > tmp.json
             mv tmp.json $XRAY_CONFIG
             systemctl restart xray
             ;;
-        8)
+        9)
             read -p "Enter new WebSocket port: " new_port
             sed -i "s/LISTENING_PORT = .*/LISTENING_PORT = $new_port/g" /usr/local/bin/ws-ssh.py
             systemctl restart ws-ssh
             ;;
-        9)
+        10)
             return 0
             ;;
         *)
