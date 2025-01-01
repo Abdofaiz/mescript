@@ -754,6 +754,103 @@ EOF
     echo -e "${GREEN}Port(s) updated successfully${NC}"
 }
 
+# Function to create SSH UDP account
+create_ssh_udp() {
+    clear
+    echo -e "${GREEN}=== Create SSH UDP Account ===${NC}"
+    read -p "Username: " username
+    read -p "Password: " password
+    read -p "Duration (days): " duration
+    read -p "UDP Port Range (example: 1-65535): " udp_range
+
+    # Check if user exists
+    if id "$username" &>/dev/null; then
+        echo -e "${RED}Error: User already exists${NC}"
+        return 1
+    fi
+
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
+    
+    # Create user
+    useradd -e $(date -d "$exp_date" +"%Y-%m-%d") -s /bin/false -M "$username"
+    echo "$username:$password" | chpasswd
+
+    # Configure UDP ports
+    iptables -t nat -A PREROUTING -p udp --dport $udp_range -j REDIRECT --to-port 22
+    iptables-save > /etc/iptables.rules
+
+    # Add to database
+    echo "ssh_udp:${username}:${password}:${exp_date}:${udp_range}" >> $USER_DB
+
+    # Get server IP
+    server_ip=$(curl -s ipv4.icanhazip.com)
+
+    clear
+    echo -e "${GREEN}SSH UDP Account Created Successfully${NC}"
+    echo -e "Username: $username"
+    echo -e "Password: $password"
+    echo -e "Expired Date: $exp_date"
+    echo -e "\nConnection Details:"
+    echo -e "Server IP: $server_ip"
+    echo -e "UDP Ports: $udp_range"
+    echo -e "Badvpn Ports: 7100, 7200, 7300"
+}
+
+# Function to delete SSH UDP account
+delete_ssh_udp() {
+    clear
+    echo -e "${GREEN}=== Delete SSH UDP Account ===${NC}"
+    echo -e "Current UDP users:"
+    echo -e "${YELLOW}"
+    grep "^ssh_udp:" $USER_DB | cut -d: -f2
+    echo -e "${NC}"
+    read -p "Username to delete: " username
+
+    # Check if user exists
+    if ! grep -q "^ssh_udp:$username:" $USER_DB; then
+        echo -e "${RED}Error: User not found${NC}"
+        return 1
+    fi
+
+    # Get UDP range
+    udp_range=$(grep "^ssh_udp:$username:" $USER_DB | cut -d: -f5)
+    
+    # Remove UDP rules
+    iptables -t nat -D PREROUTING -p udp --dport $udp_range -j REDIRECT --to-port 22
+    iptables-save > /etc/iptables.rules
+
+    # Delete user
+    userdel -f "$username"
+    sed -i "/^ssh_udp:$username:/d" $USER_DB
+
+    echo -e "${GREEN}SSH UDP account deleted successfully${NC}"
+}
+
+# Function to check SSH UDP users
+check_ssh_udp() {
+    clear
+    echo -e "${GREEN}=== SSH UDP User Status ===${NC}"
+    echo -e "\nUser List:"
+    echo -e "Username | UDP Ports | Expiry Date | Status"
+    echo -e "----------------------------------------"
+    while IFS=: read -r type username _ expiry udp_range; do
+        if [[ "$type" == "ssh_udp" ]]; then
+            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                status="${GREEN}Active${NC}"
+            else
+                status="${RED}Expired${NC}"
+            fi
+            echo -e "$username | $udp_range | $expiry | $status"
+        fi
+    done < $USER_DB
+    
+    echo -e "\nOnline UDP Users:"
+    echo -e "${YELLOW}"
+    netstat -anp | grep "udp" | grep ":22" | awk '{print $5}' | cut -d: -f1 | sort | uniq
+    echo -e "${NC}"
+}
+
 # Main menu loop
 while true; do
     clear
@@ -794,7 +891,12 @@ while true; do
     echo -e "${CYAN}[22]${NC} • Reboot VPS"
     echo -e "${CYAN}[23]${NC} • Exit"
     echo -e ""
-    read -p "Select menu [1-23]: " choice
+    echo -e "${YELLOW}SSH UDP Menu${NC}"
+    echo -e "${CYAN}[24]${NC} • Create SSH UDP Account"
+    echo -e "${CYAN}[25]${NC} • Delete SSH UDP Account"
+    echo -e "${CYAN}[26]${NC} • Check SSH UDP Users"
+    echo -e ""
+    read -p "Select menu [1-26]: " choice
 
     case $choice in
         1) 
@@ -905,8 +1007,20 @@ while true; do
             clear
             exit 0 
             ;;
+        24)
+            create_ssh_udp
+            press_enter
+            ;;
+        25)
+            delete_ssh_udp
+            press_enter
+            ;;
+        26)
+            check_ssh_udp
+            press_enter
+            ;;
         *)
-            echo -e "${RED}Please enter a number between 1 and 23${NC}"
+            echo -e "${RED}Please enter a number between 1 and 26${NC}"
             press_enter
             ;;
     esac
