@@ -145,6 +145,13 @@ check_ssh_ovpn() {
     read -n 1 -s -r -p "Press any key to continue"
 }
 
+# Add this function at the beginning of the script
+press_enter() {
+    echo ""
+    echo -e "${YELLOW}Press enter to return to the main menu...${NC}"
+    read
+}
+
 # Main menu
 while true; do
     clear
@@ -188,24 +195,78 @@ while true; do
     read -p "Select menu: " choice
 
     case $choice in
-        1) create_ssh_ovpn ;;
-        2) delete_ssh_ovpn ;;
-        3) extend_ssh_ovpn ;;
-        4) check_ssh_ovpn ;;
-        5) echo "Creating VMess Account..." ;;
-        6) echo "Deleting VMess Account..." ;;
-        7) echo "Extending VMess Account..." ;;
-        8) echo "Checking VMess Users..." ;;
-        9) echo "Creating VLess Account..." ;;
-        10) echo "Deleting VLess Account..." ;;
-        11) echo "Extending VLess Account..." ;;
-        12) echo "Checking VLess Users..." ;;
-        13) echo "Creating WebSocket Account..." ;;
-        14) echo "Deleting WebSocket Account..." ;;
-        15) echo "Extending WebSocket Account..." ;;
-        16) echo "Checking WebSocket Users..." ;;
-        17) echo "Adding/Changing Domain..." ;;
-        18) echo "Changing Port Services..." ;;
+        1) 
+            create_ssh_ovpn
+            press_enter
+            ;;
+        2) 
+            delete_ssh_ovpn
+            press_enter
+            ;;
+        3) 
+            extend_ssh_ovpn
+            press_enter
+            ;;
+        4) 
+            check_ssh_ovpn
+            press_enter
+            ;;
+        5) 
+            echo "Creating VMess Account..."
+            press_enter
+            ;;
+        6) 
+            echo "Deleting VMess Account..."
+            press_enter
+            ;;
+        7) 
+            echo "Extending VMess Account..."
+            press_enter
+            ;;
+        8) 
+            echo "Checking VMess Users..."
+            press_enter
+            ;;
+        9) 
+            echo "Creating VLess Account..."
+            press_enter
+            ;;
+        10) 
+            echo "Deleting VLess Account..."
+            press_enter
+            ;;
+        11) 
+            echo "Extending VLess Account..."
+            press_enter
+            ;;
+        12) 
+            echo "Checking VLess Users..."
+            press_enter
+            ;;
+        13) 
+            echo "Creating WebSocket Account..."
+            press_enter
+            ;;
+        14) 
+            echo "Deleting WebSocket Account..."
+            press_enter
+            ;;
+        15) 
+            echo "Extending WebSocket Account..."
+            press_enter
+            ;;
+        16) 
+            echo "Checking WebSocket Users..."
+            press_enter
+            ;;
+        17) 
+            echo "Adding/Changing Domain..."
+            press_enter
+            ;;
+        18) 
+            echo "Changing Port Services..."
+            press_enter
+            ;;
         19) 
             clear
             echo -e "${GREEN}=== System Status ===${NC}"
@@ -213,7 +274,7 @@ while true; do
             echo -e "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')"
             echo -e "Disk Usage: $(df -h / | awk 'NR==2{print $5}')"
             echo ""
-            read -n 1 -s -r -p "Press any key to continue"
+            press_enter
             ;;
         20)
             clear
@@ -225,22 +286,26 @@ while true; do
             echo -e "Xray: $(systemctl is-active xray)"
             echo -e "WebSocket: $(systemctl is-active ws-ssh)"
             echo ""
-            read -n 1 -s -r -p "Press any key to continue"
+            press_enter
             ;;
         21)
             clear
             echo -e "${GREEN}=== Memory Usage ===${NC}"
             free -h
             echo ""
-            read -n 1 -s -r -p "Press any key to continue"
+            press_enter
             ;;
         22)
             read -p "Are you sure you want to reboot? [y/n]: " answer
             if [ "$answer" == "y" ]; then
                 reboot
             fi
+            press_enter
             ;;
         23) exit 0 ;;
-        *) echo -e "${RED}Invalid option${NC}" ;;
+        *) 
+            echo -e "${RED}Invalid option${NC}"
+            press_enter
+            ;;
     esac
 done 
