@@ -32,8 +32,10 @@ cat > /root/udp/config.json <<EOF
 }
 EOF
 
-# Allow UDP ports
+# Allow UDP ports - fixed port range syntax
 ufw allow 36712/udp
-ufw allow 1-65535/udp
+for port in {1..65535}; do
+    ufw allow $port/udp >/dev/null 2>&1
+done
 
 echo -e "${GREEN}UDP Custom installed successfully${NC}" 
