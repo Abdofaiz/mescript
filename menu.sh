@@ -861,24 +861,35 @@ start_udp_custom() {
     if systemctl is-active udp-custom >/dev/null 2>&1; then
         echo -e "${YELLOW}UDP Custom is already running${NC}"
     else
-        systemctl start udp-custom
+        screen -dmS udp-custom udp-custom server
         sleep 2
-        if systemctl is-active udp-custom >/dev/null 2>&1; then
+        if pgrep -x "udp-custom" > /dev/null; then
             echo -e "${GREEN}UDP Custom started successfully${NC}"
         else
             echo -e "${RED}Failed to start UDP Custom${NC}"
+            echo -e "Trying alternative method..."
+            /root/udp/udp-custom server &
+            sleep 2
+            if pgrep -x "udp-custom" > /dev/null; then
+                echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
+            else
+                echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
+            fi
         fi
     fi
 }
 
 stop_udp_custom() {
-    if systemctl is-active udp-custom >/dev/null 2>&1; then
-        systemctl stop udp-custom
+    if pgrep -x "udp-custom" > /dev/null; then
+        pkill -x "udp-custom"
         sleep 2
-        if ! systemctl is-active udp-custom >/dev/null 2>&1; then
+        if ! pgrep -x "udp-custom" > /dev/null; then
             echo -e "${GREEN}UDP Custom stopped successfully${NC}"
         else
             echo -e "${RED}Failed to stop UDP Custom${NC}"
+            echo -e "Trying force kill..."
+            killall -9 udp-custom
+            echo -e "${GREEN}UDP Custom force stopped${NC}"
         fi
     else
         echo -e "${YELLOW}UDP Custom is not running${NC}"
@@ -886,13 +897,9 @@ stop_udp_custom() {
 }
 
 restart_udp_custom() {
-    systemctl restart udp-custom
+    stop_udp_custom
     sleep 2
-    if systemctl is-active udp-custom >/dev/null 2>&1; then
-        echo -e "${GREEN}UDP Custom restarted successfully${NC}"
-    else
-        echo -e "${RED}Failed to restart UDP Custom${NC}"
-    fi
+    start_udp_custom
 }
 
 # Main menu loop
