@@ -1483,13 +1483,9 @@ ufw allow 2087/tcp      # Trojan Go
 install_udp_custom() {
     echo -e "${GREEN}Installing UDP Custom...${NC}"
     
-    # Install dependencies
-    apt-get update
-    apt-get install -y wget curl git screen
-
-    # Download UDP Custom binary
-    wget -q -O /usr/bin/udp-custom "https://raw.githubusercontent.com/Andyvpn/Autoscript-by-azi/main/udp-custom-linux-amd64"
-    chmod +x /usr/bin/udp-custom
+    # Download UDP Custom from ADMRufu repository
+    wget -O ${ADMRufu}/install/udp-custom "https://raw.githubusercontent.com/rudi9999/ADMRufu/main/Utils/udp-custom/udp-custom"
+    chmod +x ${ADMRufu}/install/udp-custom
 
     # Create UDP config directory and config file
     mkdir -p /root/udp
@@ -1508,13 +1504,13 @@ EOF
     # Create service file
     cat > /etc/systemd/system/udp-custom.service <<EOF
 [Unit]
-Description=UDP Custom by ePro Dev. Team
+Description=UDP Custom by rudi9999
 After=network.target
 
 [Service]
 User=root
 WorkingDirectory=/root/udp
-ExecStart=/usr/bin/udp-custom server
+ExecStart=${ADMRufu}/install/udp-custom server
 Restart=always
 RestartSec=3s
 
@@ -1523,9 +1519,20 @@ WantedBy=multi-user.target
 EOF
 
     # Set permissions
-    chmod +x /usr/bin/udp-custom
+    chmod +x ${ADMRufu}/install/udp-custom
     chmod 644 /etc/systemd/system/udp-custom.service
     chmod 644 /root/udp/config.json
+
+    # Create required directories
+    mkdir -p ${ADMRufu}/bin
+    mkdir -p ${ADMRufu}/sbin
+
+    # Download additional components
+    wget -O ${ADMRufu}/sbin/udpcustom "https://raw.githubusercontent.com/rudi9999/ADMRufu/main/Utils/protocolsUDP/udpcustom/udpcustom"
+    chmod +x ${ADMRufu}/sbin/udpcustom
+
+    # Create symlinks
+    ln -sf ${ADMRufu}/sbin/udpcustom /usr/bin/udpcustom
 
     # Enable and start service
     systemctl daemon-reload
@@ -1536,6 +1543,11 @@ EOF
     ufw allow 36712/udp
     ufw allow 1-65535/udp
 }
+
+# Create ADMRufu directories if they don't exist
+ADMRufu="/etc/ADMRufu"
+[ ! -d ${ADMRufu} ] && mkdir ${ADMRufu}
+[ ! -d ${ADMRufu}/install ] && mkdir ${ADMRufu}/install
 
 # Call the function
 install_udp_custom 
