@@ -1483,8 +1483,12 @@ ufw allow 2087/tcp      # Trojan Go
 install_udp_custom() {
     echo -e "${GREEN}Installing UDP Custom...${NC}"
     
+    # Install dependencies
+    apt-get update
+    apt-get install -y wget curl git screen
+
     # Download UDP Custom binary
-    wget -O /usr/bin/udp-custom "https://github.com/Andyvpn/UDP-Custom/raw/main/udp-custom-linux-amd64"
+    wget -q -O /usr/bin/udp-custom "https://raw.githubusercontent.com/Andyvpn/Autoscript-by-azi/main/udp-custom-linux-amd64"
     chmod +x /usr/bin/udp-custom
 
     # Create UDP config directory and config file
