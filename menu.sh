@@ -757,7 +757,7 @@ EOF
 # Function to create SSH UDP account
 create_ssh_udp() {
     clear
-    echo -e "${GREEN}=== Create SSH UDP Account ===${NC}"
+    echo -e "${GREEN}=== Create UDP Custom Account ===${NC}"
     read -p "Username: " username
     read -p "Password: " password
     read -p "Duration (days): " duration
@@ -778,93 +778,82 @@ create_ssh_udp() {
     # Get server IP
     server_ip=$(curl -s ipv4.icanhazip.com)
 
-    # Create HTTP Custom config
-    cat > /home/$username-http.txt <<EOF
-# HTTP Custom Configuration
-Host: $server_ip
-Port: 22
-Username: $username
-Password: $password
-ProxyIP: $server_ip
-ProxyPort: 80
-Payload: GET / HTTP/1.1[crlf]Host: $server_ip[crlf]Upgrade: websocket[crlf][crlf]
+    # Add to UDP Custom config
+    cat >> /root/udp/config.json <<EOF
+{
+    "username": "${username}",
+    "password": "${password}",
+    "exp": "${exp_date}"
+}
+EOF
 
-# UDP Configuration
-UDP Gateway: 127.0.0.1
-UDP Ports: 7100, 7200, 7300
+    # Create client config
+    cat > /home/$username-udp.txt <<EOF
+# UDP Custom Config
+Server: ${server_ip}
+Port: 1-65535
+Username: ${username}
+Password: ${password}
+Expired: ${exp_date}
+
+# Additional Info
+UDP Port: All ports from 1-65535 are available
+Default Excluded Ports: 53,5300 (DNS)
 EOF
 
     clear
-    echo -e "${GREEN}SSH UDP Account Created Successfully${NC}"
+    echo -e "${GREEN}UDP Custom Account Created Successfully${NC}"
     echo -e "Username: $username"
     echo -e "Password: $password"
     echo -e "Expired Date: $exp_date"
     echo -e "\nConnection Details:"
-    echo -e "Server IP: $server_ip"
-    echo -e "SSH Port: 22"
-    echo -e "Proxy Port: 80"
-    echo -e "UDP Ports: 7100, 7200, 7300"
-    echo -e "\nHTTP Custom Settings:"
-    echo -e "Host: $server_ip"
-    echo -e "Port: 22"
-    echo -e "Proxy IP: $server_ip"
-    echo -e "Proxy Port: 80"
-    echo -e "Payload: GET / HTTP/1.1[crlf]Host: $server_ip[crlf]Upgrade: websocket[crlf][crlf]"
-    echo -e "\nConfig file saved as: /home/$username-http.txt"
+    echo -e "Server Host: $server_ip"
+    echo -e "Available Ports: 1-65535"
+    echo -e "Excluded Ports: 53,5300"
+    echo -e "\nConfig file saved as: /home/$username-udp.txt"
 }
 
-# Function to delete SSH UDP account
+# Function to delete UDP account
 delete_ssh_udp() {
     clear
-    echo -e "${GREEN}=== Delete SSH UDP Account ===${NC}"
+    echo -e "${GREEN}=== Delete UDP Custom Account ===${NC}"
     echo -e "Current UDP users:"
     echo -e "${YELLOW}"
-    grep "^ssh_udp:" $USER_DB | cut -d: -f2
+    jq -r '.[] | select(.username != null) | .username' /root/udp/config.json
     echo -e "${NC}"
     read -p "Username to delete: " username
 
-    # Check if user exists
-    if ! grep -q "^ssh_udp:$username:" $USER_DB; then
-        echo -e "${RED}Error: User not found${NC}"
-        return 1
-    fi
+    # Delete from UDP config
+    jq --arg user "$username" 'del(.[] | select(.username == $user))' /root/udp/config.json > /root/udp/config.json.tmp
+    mv /root/udp/config.json.tmp /root/udp/config.json
 
-    # Get UDP range
-    udp_range=$(grep "^ssh_udp:$username:" $USER_DB | cut -d: -f5)
-    
-    # Remove UDP rules
-    iptables -t nat -D PREROUTING -p udp --dport $udp_range -j REDIRECT --to-port 22
-    iptables-save > /etc/iptables.rules
-
-    # Delete user
+    # Delete system user
     userdel -f "$username"
-    sed -i "/^ssh_udp:$username:/d" $USER_DB
+    rm -f /home/$username-udp.txt
 
-    echo -e "${GREEN}SSH UDP account deleted successfully${NC}"
+    echo -e "${GREEN}UDP Custom account deleted successfully${NC}"
 }
 
-# Function to check SSH UDP users
+# Function to check UDP users
 check_ssh_udp() {
     clear
-    echo -e "${GREEN}=== SSH UDP User Status ===${NC}"
+    echo -e "${GREEN}=== UDP Custom User Status ===${NC}"
     echo -e "\nUser List:"
-    echo -e "Username | UDP Ports | Expiry Date | Status"
+    echo -e "Username | Expiry Date | Status"
     echo -e "----------------------------------------"
-    while IFS=: read -r type username _ expiry udp_range; do
-        if [[ "$type" == "ssh_udp" ]]; then
-            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
-                status="${GREEN}Active${NC}"
-            else
-                status="${RED}Expired${NC}"
-            fi
-            echo -e "$username | $udp_range | $expiry | $status"
-        fi
-    done < $USER_DB
     
-    echo -e "\nOnline UDP Users:"
-    echo -e "${YELLOW}"
-    netstat -anp | grep "udp" | grep ":22" | awk '{print $5}' | cut -d: -f1 | sort | uniq
-    echo -e "${NC}"
+    while read -r user; do
+        exp=$(jq -r --arg user "$user" '.[] | select(.username == $user) | .exp' /root/udp/config.json)
+        if [[ $(date -d "$exp" +%s) -gt $(date +%s) ]]; then
+            status="${GREEN}Active${NC}"
+        else
+            status="${RED}Expired${NC}"
+        fi
+        echo -e "$user | $exp | $status"
+    done < <(jq -r '.[].username' /root/udp/config.json)
+    
+    echo -e "\nActive Connections:"
+    netstat -anp | grep ESTABLISHED | grep udp
 }
 
 # Main menu loop
@@ -912,7 +901,11 @@ while true; do
     echo -e "${CYAN}[25]${NC} • Delete SSH UDP Account"
     echo -e "${CYAN}[26]${NC} • Check SSH UDP Users"
     echo -e ""
-    read -p "Select menu [1-26]: " choice
+    echo -e "${CYAN}[27]${NC} • Start UDP Custom"
+    echo -e "${CYAN}[28]${NC} • Stop UDP Custom"
+    echo -e "${CYAN}[29]${NC} • Restart UDP Custom"
+    echo -e ""
+    read -p "Select menu [1-29]: " choice
 
     case $choice in
         1) 
@@ -1035,8 +1028,23 @@ while true; do
             check_ssh_udp
             press_enter
             ;;
+        27)
+            systemctl start udp-custom
+            echo -e "${GREEN}UDP Custom started${NC}"
+            press_enter
+            ;;
+        28)
+            systemctl stop udp-custom
+            echo -e "${GREEN}UDP Custom stopped${NC}"
+            press_enter
+            ;;
+        29)
+            systemctl restart udp-custom
+            echo -e "${GREEN}UDP Custom restarted${NC}"
+            press_enter
+            ;;
         *)
-            echo -e "${RED}Please enter a number between 1 and 26${NC}"
+            echo -e "${RED}Please enter a number between 1 and 29${NC}"
             press_enter
             ;;
     esac

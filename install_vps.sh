@@ -1478,3 +1478,18 @@ ufw allow 8181/tcp      # OHP SSH
 ufw allow 8282/tcp      # OHP Dropbear
 ufw allow 8383/tcp      # OHP OpenVPN
 ufw allow 2087/tcp      # Trojan Go 
+
+# Install UDP Custom
+install_udp_custom() {
+    echo -e "${GREEN}Installing UDP Custom...${NC}"
+    
+    # Clone UDP Custom repository
+    cd /root
+    git clone https://github.com/http-custom/udp-custom
+    cd udp-custom
+    chmod +x install.sh
+    ./install.sh
+}
+
+# Add this line after other installations
+install_udp_custom 
