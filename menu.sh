@@ -880,11 +880,14 @@ start_udp_custom() {
                     echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
                 else
                     echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
+                    echo -e "Run these commands to reinstall:"
+                    echo -e "${YELLOW}cd /root && rm -rf udp-custom && git clone https://github.com/http-custom/udp-custom && cd udp-custom && chmod +x install.sh && ./install.sh${NC}"
                 fi
             fi
         else
             echo -e "${RED}UDP Custom binary not found. Please reinstall.${NC}"
-            echo -e "${YELLOW}Run: cd /root && git clone https://github.com/http-custom/udp-custom && cd udp-custom && chmod +x install.sh && ./install.sh${NC}"
+            echo -e "Run these commands to install:"
+            echo -e "${YELLOW}cd /root && git clone https://github.com/http-custom/udp-custom && cd udp-custom && chmod +x install.sh && ./install.sh${NC}"
         fi
     fi
 }
