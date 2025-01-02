@@ -856,6 +856,45 @@ check_ssh_udp() {
     netstat -anp | grep ESTABLISHED | grep udp
 }
 
+# Update the UDP service management functions
+start_udp_custom() {
+    if systemctl is-active udp-custom >/dev/null 2>&1; then
+        echo -e "${YELLOW}UDP Custom is already running${NC}"
+    else
+        systemctl start udp-custom
+        sleep 2
+        if systemctl is-active udp-custom >/dev/null 2>&1; then
+            echo -e "${GREEN}UDP Custom started successfully${NC}"
+        else
+            echo -e "${RED}Failed to start UDP Custom${NC}"
+        fi
+    fi
+}
+
+stop_udp_custom() {
+    if systemctl is-active udp-custom >/dev/null 2>&1; then
+        systemctl stop udp-custom
+        sleep 2
+        if ! systemctl is-active udp-custom >/dev/null 2>&1; then
+            echo -e "${GREEN}UDP Custom stopped successfully${NC}"
+        else
+            echo -e "${RED}Failed to stop UDP Custom${NC}"
+        fi
+    else
+        echo -e "${YELLOW}UDP Custom is not running${NC}"
+    fi
+}
+
+restart_udp_custom() {
+    systemctl restart udp-custom
+    sleep 2
+    if systemctl is-active udp-custom >/dev/null 2>&1; then
+        echo -e "${GREEN}UDP Custom restarted successfully${NC}"
+    else
+        echo -e "${RED}Failed to restart UDP Custom${NC}"
+    fi
+}
+
 # Main menu loop
 while true; do
     clear
@@ -1029,18 +1068,15 @@ while true; do
             press_enter
             ;;
         27)
-            systemctl start udp-custom
-            echo -e "${GREEN}UDP Custom started${NC}"
+            start_udp_custom
             press_enter
             ;;
         28)
-            systemctl stop udp-custom
-            echo -e "${GREEN}UDP Custom stopped${NC}"
+            stop_udp_custom
             press_enter
             ;;
         29)
-            systemctl restart udp-custom
-            echo -e "${GREEN}UDP Custom restarted${NC}"
+            restart_udp_custom
             press_enter
             ;;
         *)
