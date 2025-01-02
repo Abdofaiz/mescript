@@ -13,6 +13,9 @@ NC='\033[0m'
 XRAY_CONFIG="/usr/local/etc/xray/config.json"
 USER_DB="/etc/vps/users.db"
 
+# Add after color definitions
+ADMRufu="/etc/ADMRufu"
+
 # Create user database if it doesn't exist
 [ ! -f "$USER_DB" ] && touch "$USER_DB"
 
