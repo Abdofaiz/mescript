@@ -858,29 +858,35 @@ check_ssh_udp() {
 
 # Update the UDP service management functions
 start_udp_custom() {
-    if systemctl is-active udp-custom >/dev/null 2>&1; then
+    if pgrep -x "udp-custom" > /dev/null; then
         echo -e "${YELLOW}UDP Custom is already running${NC}"
     else
-        screen -dmS udp-custom udp-custom server
-        sleep 2
-        if pgrep -x "udp-custom" > /dev/null; then
-            echo -e "${GREEN}UDP Custom started successfully${NC}"
-        else
-            echo -e "${RED}Failed to start UDP Custom${NC}"
-            echo -e "Trying alternative method..."
-            /root/udp/udp-custom server &
+        echo -e "${GREEN}Starting UDP Custom...${NC}"
+        if [ -f "/usr/bin/udp-custom" ]; then
+            screen -dmS udp-custom /usr/bin/udp-custom server
             sleep 2
             if pgrep -x "udp-custom" > /dev/null; then
-                echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
+                echo -e "${GREEN}UDP Custom started successfully${NC}"
             else
-                echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
+                echo -e "${RED}Failed to start UDP Custom${NC}"
+                echo -e "Trying alternative method..."
+                cd /root/udp && /usr/bin/udp-custom server &
+                sleep 2
+                if pgrep -x "udp-custom" > /dev/null; then
+                    echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
+                else
+                    echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
+                fi
             fi
+        else
+            echo -e "${RED}UDP Custom binary not found. Please reinstall.${NC}"
         fi
     fi
 }
 
 stop_udp_custom() {
     if pgrep -x "udp-custom" > /dev/null; then
+        echo -e "${GREEN}Stopping UDP Custom...${NC}"
         pkill -x "udp-custom"
         sleep 2
         if ! pgrep -x "udp-custom" > /dev/null; then
@@ -897,6 +903,7 @@ stop_udp_custom() {
 }
 
 restart_udp_custom() {
+    echo -e "${GREEN}Restarting UDP Custom...${NC}"
     stop_udp_custom
     sleep 2
     start_udp_custom
