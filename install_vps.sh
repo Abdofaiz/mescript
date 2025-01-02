@@ -96,21 +96,32 @@ install_stunnel() {
 
 # Modify the BadVPN installation
 install_badvpn() {
-    # Install build dependencies
-    apt-get install -y cmake make gcc g++ unzip
-    
-    # Download and compile BadVPN
     cd /usr/local/src
     wget https://github.com/ambrop72/badvpn/archive/refs/tags/1.999.130.tar.gz
-    tar xzf 1.999.130.tar.gz
+    tar xf 1.999.130.tar.gz
     cd badvpn-1.999.130
     cmake -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
     make install
     
-    # Create directory for the binary
-    mkdir -p /usr/bin
-    cp build/udpgw/badvpn-udpgw /usr/bin/badvpn-udpgw
-    chmod +x /usr/bin/badvpn-udpgw
+    # Create BadVPN services for different ports
+    for port in 7100 7200 7300; do
+        cat > /etc/systemd/system/badvpn-udpgw-$port.service <<EOF
+[Unit]
+Description=BadVPN UDP Gateway on port $port
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/badvpn-udpgw --listen-addr 127.0.0.1:$port --max-clients 500
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl enable badvpn-udpgw-$port
+        systemctl start badvpn-udpgw-$port
+    done
 }
 
 # Replace the original package installation with these functions
@@ -1242,3 +1253,88 @@ EOF
 
 # Restart Nginx
 systemctl restart nginx 
+
+# Install HTTP Custom Proxy
+cat > /usr/local/bin/http-custom.py <<'EOF'
+#!/usr/bin/env python3
+import socket
+import select
+import threading
+import sys
+
+LISTENING_PORT = 80
+BUFFER_SIZE = 8192
+
+def handle_client(client_socket, remote_socket):
+    while True:
+        r, w, e = select.select([client_socket, remote_socket], [], [], 3)
+        if not r:
+            break
+            
+        for sock in r:
+            try:
+                data = sock.recv(BUFFER_SIZE)
+                if not data:
+                    break
+                    
+                if sock is client_socket:
+                    remote_socket.send(data)
+                else:
+                    client_socket.send(data)
+            except:
+                break
+                
+    client_socket.close()
+    remote_socket.close()
+
+def start_server():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(('0.0.0.0', LISTENING_PORT))
+    server.listen(0)
+    
+    print(f"[*] HTTP Custom Proxy listening on 0.0.0.0:{LISTENING_PORT}")
+    
+    while True:
+        try:
+            client_socket, addr = server.accept()
+            print(f"[*] Accepted connection from {addr[0]}:{addr[1]}")
+            
+            remote_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            remote_socket.connect(('127.0.0.1', 22))
+            
+            thread = threading.Thread(target=handle_client, args=(client_socket, remote_socket))
+            thread.daemon = True
+            thread.start()
+        except Exception as e:
+            print(f"[!] Error: {e}")
+            break
+            
+    server.close()
+
+if __name__ == '__main__':
+    start_server()
+EOF
+
+chmod +x /usr/local/bin/http-custom.py
+
+# Create service for HTTP Custom
+cat > /etc/systemd/system/http-custom.service <<EOF
+[Unit]
+Description=HTTP Custom Proxy Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /usr/local/bin/http-custom.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable http-custom
+systemctl start http-custom 

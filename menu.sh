@@ -761,7 +761,6 @@ create_ssh_udp() {
     read -p "Username: " username
     read -p "Password: " password
     read -p "Duration (days): " duration
-    read -p "UDP Port Range (example: 1-65535): " udp_range
 
     # Check if user exists
     if id "$username" &>/dev/null; then
@@ -776,13 +775,6 @@ create_ssh_udp() {
     useradd -e $(date -d "$exp_date" +"%Y-%m-%d") -s /bin/false -M "$username"
     echo "$username:$password" | chpasswd
 
-    # Configure UDP ports
-    iptables -t nat -A PREROUTING -p udp --dport $udp_range -j REDIRECT --to-port 22
-    iptables-save > /etc/iptables.rules
-
-    # Add to database
-    echo "ssh_udp:${username}:${password}:${exp_date}:${udp_range}" >> $USER_DB
-
     # Get server IP
     server_ip=$(curl -s ipv4.icanhazip.com)
 
@@ -791,12 +783,15 @@ create_ssh_udp() {
 # HTTP Custom Configuration
 Host: $server_ip
 Port: 22
-UDP Port: $udp_range
 Username: $username
 Password: $password
 ProxyIP: $server_ip
 ProxyPort: 80
 Payload: GET / HTTP/1.1[crlf]Host: $server_ip[crlf]Upgrade: websocket[crlf][crlf]
+
+# UDP Configuration
+UDP Gateway: 127.0.0.1
+UDP Ports: 7100, 7200, 7300
 EOF
 
     clear
@@ -806,12 +801,12 @@ EOF
     echo -e "Expired Date: $exp_date"
     echo -e "\nConnection Details:"
     echo -e "Server IP: $server_ip"
-    echo -e "UDP Ports: $udp_range"
-    echo -e "Badvpn Ports: 7100, 7200, 7300"
+    echo -e "SSH Port: 22"
+    echo -e "Proxy Port: 80"
+    echo -e "UDP Ports: 7100, 7200, 7300"
     echo -e "\nHTTP Custom Settings:"
     echo -e "Host: $server_ip"
     echo -e "Port: 22"
-    echo -e "UDP Port: $udp_range"
     echo -e "Proxy IP: $server_ip"
     echo -e "Proxy Port: 80"
     echo -e "Payload: GET / HTTP/1.1[crlf]Host: $server_ip[crlf]Upgrade: websocket[crlf][crlf]"
