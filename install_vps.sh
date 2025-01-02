@@ -350,32 +350,66 @@ apt-get upgrade -y
 
 # Configure Stunnel
 echo -e "${GREEN}Configuring Stunnel...${NC}"
+
+# Create required directories
+mkdir -p /var/run/stunnel4
+mkdir -p /etc/stunnel
+chmod 755 /var/run/stunnel4
+
+# Create Stunnel configuration
 cat > /etc/stunnel/stunnel.conf <<EOF
-pid = /var/run/stunnel.pid
+# Stunnel configuration file
+
+# Basic settings
+pid = /var/run/stunnel4/stunnel.pid
+output = /var/log/stunnel4/stunnel.log
+debug = 7
+syslog = no
+
+# SSL settings
 cert = /etc/stunnel/stunnel.pem
-client = no
-socket = a:SO_REUSEADDR=1
 socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
-
-[dropbear]
+client = no
+[dropbear-1]
 accept = 443
 connect = 127.0.0.1:22
 
-[dropbear]
+[dropbear-2]
 accept = 445
 connect = 127.0.0.1:22
 
-[dropbear]
+[dropbear-3]
 accept = 777
 connect = 127.0.0.1:22
 EOF
+
+# Create log directory
+mkdir -p /var/log/stunnel4
+chmod 755 /var/log/stunnel4
 
 # Generate SSL certificate
 openssl genrsa -out /etc/stunnel/stunnel.key 2048
 openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=Organization/OU=Unit/CN=domain.com"
 openssl x509 -req -days 365 -in /etc/stunnel/stunnel.csr -signkey /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt
 cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
+chmod 600 /etc/stunnel/stunnel.pem
+
+# Update Stunnel default configuration
+sed -i 's/ENABLED=0/ENABLED=1/g' /etc/default/stunnel4
+
+# Create Stunnel service override
+mkdir -p /etc/systemd/system/stunnel4.service.d/
+cat > /etc/systemd/system/stunnel4.service.d/override.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
+Type=forking
+EOF
+
+# Reload systemd and restart Stunnel
+systemctl daemon-reload
+systemctl restart stunnel4
 
 # Configure Dropbear
 echo -e "${GREEN}Configuring Dropbear...${NC}"
@@ -1338,3 +1372,109 @@ EOF
 systemctl daemon-reload
 systemctl enable http-custom
 systemctl start http-custom 
+
+# Configure Stunnel5 (based on cfsshws repository)
+echo -e "${GREEN}Configuring Stunnel5...${NC}"
+
+# Install Stunnel5
+apt-get install -y stunnel5
+
+# Create required directories
+mkdir -p /etc/stunnel5
+mkdir -p /var/log/stunnel5
+
+# Create Stunnel configuration
+cat > /etc/stunnel5/stunnel5.conf <<EOF
+cert = /etc/stunnel5/stunnel5.pem
+client = no
+socket = a:SO_REUSEADDR=1
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+
+[dropbear]
+accept = 445
+connect = 127.0.0.1:109
+
+[openssh]
+accept = 777
+connect = 127.0.0.1:22
+
+[openvpn]
+accept = 990
+connect = 127.0.0.1:1194
+
+[stunnel]
+accept = 443
+connect = 127.0.0.1:222
+EOF
+
+# Generate SSL certificate
+openssl genrsa -out /etc/stunnel5/stunnel5.key 2048
+openssl req -new -key /etc/stunnel5/stunnel5.key -out /etc/stunnel5/stunnel5.csr -subj "/C=ID/ST=Jakarta/L=Jakarta/O=Stunnel/OU=Stunnel/CN=Stunnel"
+openssl x509 -req -days 365 -in /etc/stunnel5/stunnel5.csr -signkey /etc/stunnel5/stunnel5.key -out /etc/stunnel5/stunnel5.crt
+cat /etc/stunnel5/stunnel5.key /etc/stunnel5/stunnel5.crt > /etc/stunnel5/stunnel5.pem
+
+# Create systemd service
+cat > /etc/systemd/system/stunnel5.service <<EOF
+[Unit]
+Description=Stunnel5 Service
+Documentation=https://stunnel.org
+After=syslog.target network-online.target
+
+[Service]
+ExecStart=/usr/bin/stunnel5 /etc/stunnel5/stunnel5.conf
+Type=forking
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Set permissions
+chmod 600 /etc/stunnel5/stunnel5.pem
+chown -R nobody:nogroup /var/log/stunnel5
+
+# Enable and start service
+systemctl enable stunnel5
+systemctl start stunnel5 
+
+# Update port configurations based on cfsshws
+# SSH: 443, 22
+# OpenVPN: TCP 1194, UDP 2200, SSL 990
+# Stunnel5: 443, 445, 777
+# Dropbear: 443, 109, 143
+# Squid Proxy: 3128, 8080
+# Badvpn: 7100, 7200, 7300
+# Nginx: 89
+# XRAYS Vmess TLS: 8443
+# XRAYS Vmess None TLS: 80
+# XRAYS Vless TLS: 8443
+# XRAYS Vless None TLS: 80
+# XRAYS Trojan: 2083
+# Websocket TLS: 443
+# Websocket None TLS: 80
+# Websocket Ovpn: 2086
+# OHP SSH: 8181
+# OHP Dropbear: 8282
+# OHP OpenVPN: 8383
+# Trojan Go: 2087
+
+# Configure UFW with these ports
+ufw allow 22/tcp        # SSH
+ufw allow 443/tcp       # SSL/TLS
+ufw allow 80/tcp        # HTTP
+ufw allow 1194/tcp      # OpenVPN TCP
+ufw allow 2200/udp      # OpenVPN UDP
+ufw allow 990/tcp       # OpenVPN SSL
+ufw allow 109/tcp       # Dropbear
+ufw allow 143/tcp       # Dropbear
+ufw allow 3128/tcp      # Squid
+ufw allow 8080/tcp      # Squid
+ufw allow 7100:7300/udp # BadVPN
+ufw allow 89/tcp        # Nginx
+ufw allow 8443/tcp      # XRAYS
+ufw allow 2083/tcp      # XRAYS Trojan
+ufw allow 2086/tcp      # WS OpenVPN
+ufw allow 8181/tcp      # OHP SSH
+ufw allow 8282/tcp      # OHP Dropbear
+ufw allow 8383/tcp      # OHP OpenVPN
+ufw allow 2087/tcp      # Trojan Go 
