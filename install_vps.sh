@@ -1483,13 +1483,56 @@ ufw allow 2087/tcp      # Trojan Go
 install_udp_custom() {
     echo -e "${GREEN}Installing UDP Custom...${NC}"
     
-    # Clone UDP Custom repository
-    cd /root
-    git clone https://github.com/http-custom/udp-custom
-    cd udp-custom
-    chmod +x install.sh
-    ./install.sh
+    # Download UDP Custom binary
+    wget -O /usr/bin/udp-custom "https://raw.githubusercontent.com/Andyvpn/UDP-Custom/main/bin/udp-custom-linux-amd64"
+    chmod +x /usr/bin/udp-custom
+
+    # Create UDP Custom config directory
+    mkdir -p /etc/udp
+    
+    # Create default config
+    cat > /etc/udp/config.json <<EOF
+{
+    "listen": ":36712",
+    "stream_buffer": 16777216,
+    "receive_buffer": 33554432,
+    "auth": {
+        "mode": "passwords"
+    }
+}
+EOF
+
+    # Create service file
+    cat > /etc/systemd/system/udp-custom.service <<EOF
+[Unit]
+Description=UDP Custom Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/udp
+ExecStart=/usr/bin/udp-custom server
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Create config directory and database
+    mkdir -p /root/udp
+    touch /root/udp/config.json
+    echo "[]" > /root/udp/config.json
+
+    # Reload systemd and enable service
+    systemctl daemon-reload
+    systemctl enable udp-custom
+    systemctl start udp-custom
+
+    # Add UDP ports to firewall
+    ufw allow 36712/udp
 }
 
-# Add this line after other installations
+# Call the function
 install_udp_custom 
