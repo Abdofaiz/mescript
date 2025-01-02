@@ -1177,6 +1177,35 @@ cat > /usr/local/etc/xray/config.json <<EOF
         "enabled": true,
         "destOverride": ["http", "tls"]
       }
+    },
+    {
+      "port": 8880,
+      "protocol": "vmess",
+      "settings": {
+        "clients": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/vmess",
+          "headers": {}
+        }
+      }
+    },
+    {
+      "port": 8881,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/vless",
+          "headers": {}
+        }
+      }
     }
   ],
   "outbounds": [
@@ -1489,7 +1518,7 @@ mkdir -p /etc/ADMRufu/bin
 mkdir -p /etc/ADMRufu/sbin
 
 # Download UDP Custom binary
-wget -O /etc/ADMRufu/install/udp-custom "https://raw.githubusercontent.com/rudi9999/ADMRufu/main/Utils/udp-custom/udp-custom"
+wget -O /etc/ADMRufu/install/udp-custom "https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom"
 chmod +x /etc/ADMRufu/install/udp-custom
 
 # Create UDP config directory and config file
@@ -1517,24 +1546,13 @@ ln -sf /etc/ADMRufu/sbin/udpcustom /usr/bin/udpcustom
 install_udp_custom() {
     echo -e "${GREEN}Installing UDP Custom...${NC}"
     
-    # Install dependencies
-    apt-get update
-    apt-get install -y wget git screen
-
-    # Remove old installation
-    rm -rf /root/udp-custom
-    rm -f /usr/bin/udp-custom
-    systemctl stop udp-custom
-    systemctl disable udp-custom
-    rm -f /etc/systemd/system/udp-custom.service
-
-    # Clone and install UDP Custom
-    cd /root
-    git clone https://github.com/http-custom/udp-custom
-    cd udp-custom
-    chmod +x install.sh
-    ./install.sh
-
+    # Create required directories
+    mkdir -p /etc/ADMRufu/install
+    
+    # Download UDP Custom binary from ADMRufu repository
+    wget -O /etc/ADMRufu/install/udp-custom "https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom"
+    chmod +x /etc/ADMRufu/install/udp-custom
+    
     # Create config directory
     mkdir -p /root/udp
     cat > /root/udp/config.json <<EOF
@@ -1549,11 +1567,36 @@ install_udp_custom() {
 }
 EOF
 
+    # Create service file
+    cat > /etc/systemd/system/udp-custom.service <<EOF
+[Unit]
+Description=UDP Custom by rudi9999
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/udp
+ExecStart=/etc/ADMRufu/install/udp-custom server
+Restart=always
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Set permissions
+    chmod +x /etc/ADMRufu/install/udp-custom
+    chmod 644 /etc/systemd/system/udp-custom.service
+    chmod 644 /root/udp/config.json
+
+    # Enable and start service
+    systemctl daemon-reload
+    systemctl enable udp-custom
+    systemctl start udp-custom
+
     # Allow UDP ports
     ufw allow 36712/udp
     ufw allow 1-65535/udp
 
-    # Start UDP Custom
-    cd /root/udp
-    screen -dmS udp-custom /root/udp-custom/udp-custom server
+    echo -e "${GREEN}UDP Custom installed successfully${NC}"
 } 
