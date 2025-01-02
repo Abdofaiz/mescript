@@ -866,7 +866,8 @@ start_udp_custom() {
     else
         echo -e "${GREEN}Starting UDP Custom...${NC}"
         if [ -f "/usr/local/udpgw/udp-custom" ]; then
-            systemctl start udp-custom
+            cd /root/udp
+            screen -dmS udp-custom /usr/local/udpgw/udp-custom server
             sleep 2
             if pgrep -x "udp-custom" > /dev/null; then
                 echo -e "${GREEN}UDP Custom started successfully${NC}"
