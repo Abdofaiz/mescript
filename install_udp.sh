@@ -19,6 +19,9 @@ mkdir -p /root/udp
 wget -O /etc/ADMRufu/install/udp-custom "https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom"
 chmod +x /etc/ADMRufu/install/udp-custom
 
+# Create symlink
+ln -sf /etc/ADMRufu/install/udp-custom /usr/bin/udp-custom
+
 # Create config file
 cat > /root/udp/config.json <<EOF
 {
@@ -32,10 +35,35 @@ cat > /root/udp/config.json <<EOF
 }
 EOF
 
-# Allow UDP ports - fixed port range syntax
+# Create service file
+cat > /etc/systemd/system/udp-custom.service <<EOF
+[Unit]
+Description=UDP Custom by rudi9999
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/udp
+ExecStart=/etc/ADMRufu/install/udp-custom server
+Restart=always
+RestartSec=3s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Set permissions
+chmod +x /etc/ADMRufu/install/udp-custom
+chmod 644 /etc/systemd/system/udp-custom.service
+chmod 644 /root/udp/config.json
+
+# Enable and start service
+systemctl daemon-reload
+systemctl enable udp-custom
+systemctl start udp-custom
+
+# Allow UDP ports
 ufw allow 36712/udp
-for port in {1..65535}; do
-    ufw allow $port/udp >/dev/null 2>&1
-done
+ufw allow 1-65535/udp
 
 echo -e "${GREEN}UDP Custom installed successfully${NC}" 
