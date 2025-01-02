@@ -865,7 +865,7 @@ start_udp_custom() {
         echo -e "${YELLOW}UDP Custom is already running${NC}"
     else
         echo -e "${GREEN}Starting UDP Custom...${NC}"
-        if [ -f "/etc/ADMRufu/install/udp-custom" ]; then
+        if [ -f "/usr/local/udpgw/udp-custom" ]; then
             systemctl start udp-custom
             sleep 2
             if pgrep -x "udp-custom" > /dev/null; then
@@ -874,20 +874,20 @@ start_udp_custom() {
                 echo -e "${RED}Failed to start UDP Custom${NC}"
                 echo -e "Trying alternative method..."
                 cd /root/udp
-                /etc/ADMRufu/install/udp-custom server &
+                /usr/local/udpgw/udp-custom server &
                 sleep 2
                 if pgrep -x "udp-custom" > /dev/null; then
                     echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
                 else
                     echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
                     echo -e "Run these commands to reinstall:"
-                    echo -e "${YELLOW}wget -O install-udp.sh \"https://raw.githubusercontent.com/Abdofaiz/mescript/main/install_udp.sh\" && chmod +x install-udp.sh && ./install-udp.sh${NC}"
+                    echo -e "${YELLOW}wget -O install-udp.sh \"https://raw.githubusercontent.com/ChumoGH/ScriptCGH/main/install-udp.sh\" && chmod +x install-udp.sh && ./install-udp.sh${NC}"
                 fi
             fi
         else
             echo -e "${RED}UDP Custom binary not found. Please reinstall.${NC}"
             echo -e "Run these commands to install:"
-            echo -e "${YELLOW}wget -O install-udp.sh \"https://raw.githubusercontent.com/Abdofaiz/mescript/main/install_udp.sh\" && chmod +x install-udp.sh && ./install-udp.sh${NC}"
+            echo -e "${YELLOW}wget -O install-udp.sh \"https://raw.githubusercontent.com/ChumoGH/ScriptCGH/main/install-udp.sh\" && chmod +x install-udp.sh && ./install-udp.sh${NC}"
         fi
     fi
 }

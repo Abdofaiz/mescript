@@ -12,15 +12,15 @@ apt-get update
 apt-get install -y wget curl screen
 
 # Create directories
-mkdir -p /etc/ADMRufu/install
+mkdir -p /usr/local/udpgw
 mkdir -p /root/udp
 
 # Download UDP Custom binary
-wget -O /etc/ADMRufu/install/udp-custom "https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom"
-chmod +x /etc/ADMRufu/install/udp-custom
+wget -O /usr/local/udpgw/udp-custom "https://raw.githubusercontent.com/ChumoGH/ScriptCGH/main/Utils/udp-custom"
+chmod +x /usr/local/udpgw/udp-custom
 
 # Create symlink
-ln -sf /etc/ADMRufu/install/udp-custom /usr/bin/udp-custom
+ln -sf /usr/local/udpgw/udp-custom /usr/bin/udp-custom
 
 # Create config file
 cat > /root/udp/config.json <<EOF
@@ -38,13 +38,14 @@ EOF
 # Create service file
 cat > /etc/systemd/system/udp-custom.service <<EOF
 [Unit]
-Description=UDP Custom by rudi9999
+Description=UDP Custom by ChumoGH
 After=network.target
 
 [Service]
+Type=simple
 User=root
 WorkingDirectory=/root/udp
-ExecStart=/etc/ADMRufu/install/udp-custom server
+ExecStart=/usr/local/udpgw/udp-custom server
 Restart=always
 RestartSec=3s
 
@@ -53,7 +54,7 @@ WantedBy=multi-user.target
 EOF
 
 # Set permissions
-chmod +x /etc/ADMRufu/install/udp-custom
+chmod +x /usr/local/udpgw/udp-custom
 chmod 644 /etc/systemd/system/udp-custom.service
 chmod 644 /root/udp/config.json
 
