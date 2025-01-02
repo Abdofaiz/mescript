@@ -1512,3 +1512,48 @@ chmod +x /etc/ADMRufu/sbin/udpcustom
 
 # Create symlink
 ln -sf /etc/ADMRufu/sbin/udpcustom /usr/bin/udpcustom 
+
+# Install UDP Custom
+install_udp_custom() {
+    echo -e "${GREEN}Installing UDP Custom...${NC}"
+    
+    # Install dependencies
+    apt-get update
+    apt-get install -y wget git screen
+
+    # Remove old installation
+    rm -rf /root/udp-custom
+    rm -f /usr/bin/udp-custom
+    systemctl stop udp-custom
+    systemctl disable udp-custom
+    rm -f /etc/systemd/system/udp-custom.service
+
+    # Clone and install UDP Custom
+    cd /root
+    git clone https://github.com/http-custom/udp-custom
+    cd udp-custom
+    chmod +x install.sh
+    ./install.sh
+
+    # Create config directory
+    mkdir -p /root/udp
+    cat > /root/udp/config.json <<EOF
+{
+    "listen": ":36712",
+    "stream_buffer": 16777216,
+    "receive_buffer": 33554432,
+    "auth": {
+        "mode": "passwords",
+        "passwords": []
+    }
+}
+EOF
+
+    # Allow UDP ports
+    ufw allow 36712/udp
+    ufw allow 1-65535/udp
+
+    # Start UDP Custom
+    cd /root/udp
+    screen -dmS udp-custom /root/udp-custom/udp-custom server
+} 
