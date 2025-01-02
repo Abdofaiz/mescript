@@ -882,13 +882,13 @@ start_udp_custom() {
                 else
                     echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
                     echo -e "Run these commands to reinstall:"
-                    echo -e "${YELLOW}mkdir -p /etc/ADMRufu/install /root/udp && wget -O /etc/ADMRufu/install/udp-custom https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom && chmod +x /etc/ADMRufu/install/udp-custom${NC}"
+                    echo -e "${YELLOW}wget -O /root/install-udp.sh https://raw.githubusercontent.com/Abdofaiz/mescript/main/install-udp.sh && chmod +x /root/install-udp.sh && bash /root/install-udp.sh${NC}"
                 fi
             fi
         else
             echo -e "${RED}UDP Custom binary not found. Please reinstall.${NC}"
             echo -e "Run these commands to install:"
-            echo -e "${YELLOW}mkdir -p /etc/ADMRufu/install /root/udp && wget -O /etc/ADMRufu/install/udp-custom https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom && chmod +x /etc/ADMRufu/install/udp-custom${NC}"
+            echo -e "${YELLOW}wget -O /root/install-udp.sh https://raw.githubusercontent.com/Abdofaiz/mescript/main/install-udp.sh && chmod +x /root/install-udp.sh && bash /root/install-udp.sh${NC}"
         fi
     fi
 }
