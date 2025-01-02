@@ -865,29 +865,29 @@ start_udp_custom() {
         echo -e "${YELLOW}UDP Custom is already running${NC}"
     else
         echo -e "${GREEN}Starting UDP Custom...${NC}"
-        if [ -f "/root/udp-custom/udp-custom" ]; then
+        if [ -f "/etc/ADMRufu/install/udp-custom" ]; then
             cd /root/udp
-            screen -dmS udp-custom /root/udp-custom/udp-custom server
+            screen -dmS udp-custom /etc/ADMRufu/install/udp-custom server
             sleep 2
             if pgrep -x "udp-custom" > /dev/null; then
                 echo -e "${GREEN}UDP Custom started successfully${NC}"
             else
                 echo -e "${RED}Failed to start UDP Custom${NC}"
                 echo -e "Trying alternative method..."
-                cd /root/udp && /root/udp-custom/udp-custom server &
+                cd /root/udp && /etc/ADMRufu/install/udp-custom server &
                 sleep 2
                 if pgrep -x "udp-custom" > /dev/null; then
                     echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
                 else
                     echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
                     echo -e "Run these commands to reinstall:"
-                    echo -e "${YELLOW}cd /root && rm -rf udp-custom && git clone https://github.com/http-custom/udp-custom && cd udp-custom && chmod +x install.sh && ./install.sh${NC}"
+                    echo -e "${YELLOW}cd /root && wget -O /etc/ADMRufu/install/udp-custom https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom && chmod +x /etc/ADMRufu/install/udp-custom${NC}"
                 fi
             fi
         else
             echo -e "${RED}UDP Custom binary not found. Please reinstall.${NC}"
             echo -e "Run these commands to install:"
-            echo -e "${YELLOW}cd /root && git clone https://github.com/http-custom/udp-custom && cd udp-custom && chmod +x install.sh && ./install.sh${NC}"
+            echo -e "${YELLOW}cd /root && wget -O /etc/ADMRufu/install/udp-custom https://github.com/rudi9999/ADMRufu/raw/main/Utils/udp-custom/udp-custom && chmod +x /etc/ADMRufu/install/udp-custom${NC}"
         fi
     fi
 }
