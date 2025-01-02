@@ -865,9 +865,9 @@ start_udp_custom() {
         echo -e "${YELLOW}UDP Custom is already running${NC}"
     else
         echo -e "${GREEN}Starting UDP Custom...${NC}"
-        if [ -f "/etc/ADMRufu/install/udp-custom" ]; then
+        if [ -f "/usr/bin/udp-custom" ]; then
             cd /root/udp
-            screen -dmS udp-custom /etc/ADMRufu/install/udp-custom server
+            screen -dmS udp-custom /usr/bin/udp-custom server
             sleep 2
             if pgrep -x "udp-custom" > /dev/null; then
                 echo -e "${GREEN}UDP Custom started successfully${NC}"
@@ -875,20 +875,20 @@ start_udp_custom() {
                 echo -e "${RED}Failed to start UDP Custom${NC}"
                 echo -e "Trying alternative method..."
                 cd /root/udp
-                /etc/ADMRufu/install/udp-custom server &
+                /usr/bin/udp-custom server &
                 sleep 2
                 if pgrep -x "udp-custom" > /dev/null; then
                     echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
                 else
                     echo -e "${RED}Failed to start UDP Custom. Please check installation${NC}"
                     echo -e "Run these commands to reinstall:"
-                    echo -e "${YELLOW}wget -O /root/install-udp.sh https://raw.githubusercontent.com/Abdofaiz/mescript/main/install-udp.sh && chmod +x /root/install-udp.sh && bash /root/install-udp.sh${NC}"
+                    echo -e "${YELLOW}wget -O install-udp.sh \"https://raw.githubusercontent.com/Abdofaiz/mescript/main/install_udp.sh\" && chmod +x install-udp.sh && ./install-udp.sh${NC}"
                 fi
             fi
         else
             echo -e "${RED}UDP Custom binary not found. Please reinstall.${NC}"
             echo -e "Run these commands to install:"
-            echo -e "${YELLOW}wget -O /root/install-udp.sh https://raw.githubusercontent.com/Abdofaiz/mescript/main/install-udp.sh && chmod +x /root/install-udp.sh && bash /root/install-udp.sh${NC}"
+            echo -e "${YELLOW}wget -O install-udp.sh \"https://raw.githubusercontent.com/Abdofaiz/mescript/main/install_udp.sh\" && chmod +x install-udp.sh && ./install-udp.sh${NC}"
         fi
     fi
 }
