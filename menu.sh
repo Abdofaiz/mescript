@@ -867,7 +867,7 @@ start_udp_custom() {
         echo -e "${GREEN}Starting UDP Custom...${NC}"
         if [ -f "/usr/bin/udp-custom" ]; then
             cd /root/udp
-            screen -dmS udp-custom /usr/bin/udp-custom server
+            screen -dmS udp-custom /etc/ADMRufu/install/udp-custom server
             sleep 2
             if pgrep -x "udp-custom" > /dev/null; then
                 echo -e "${GREEN}UDP Custom started successfully${NC}"
@@ -875,7 +875,7 @@ start_udp_custom() {
                 echo -e "${RED}Failed to start UDP Custom${NC}"
                 echo -e "Trying alternative method..."
                 cd /root/udp
-                /usr/bin/udp-custom server &
+                /etc/ADMRufu/install/udp-custom server &
                 sleep 2
                 if pgrep -x "udp-custom" > /dev/null; then
                     echo -e "${GREEN}UDP Custom started successfully (alternative method)${NC}"
