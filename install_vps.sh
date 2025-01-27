@@ -1599,4 +1599,134 @@ EOF
     ufw allow 1-65535/udp
 
     echo -e "${GREEN}UDP Custom installed successfully${NC}"
-} 
+}
+
+# Add these optimizations after the existing network settings
+
+# Function to optimize network for high-speed downloads
+optimize_network_speed() {
+    echo -e "${GREEN}Optimizing network for high-speed downloads...${NC}"
+    
+    # Optimize TCP settings
+    cat >> /etc/sysctl.conf <<EOF
+# TCP optimization for high-speed downloads
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 65536
+net.core.wmem_default = 65536
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.tcp_congestion_control = bbr
+net.core.default_qdisc = fq
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_max_syn_backlog = 8192
+net.ipv4.tcp_max_tw_buckets = 2000000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_keepalive_intvl = 10
+net.ipv4.tcp_keepalive_probes = 9
+EOF
+
+    # Apply sysctl settings
+    sysctl -p
+
+    # Enable BBR TCP congestion control
+    echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+    sysctl -p
+
+    # Optimize network interface
+    INTERFACE=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
+    ethtool -G $INTERFACE rx 4096 tx 4096 2>/dev/null || true
+
+    # Optimize IRQ balance for network cards
+    apt-get install -y irqbalance
+    systemctl enable irqbalance
+    systemctl start irqbalance
+
+    # Optimize DNS resolution
+    cat > /etc/resolv.conf <<EOF
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+options single-request-reopen
+options timeout:1
+options attempts:3
+EOF
+
+    # Install and configure speedtest-cli for testing
+    apt-get install -y speedtest-cli
+}
+
+# Function to optimize UDP performance
+optimize_udp_performance() {
+    echo -e "${GREEN}Optimizing UDP performance...${NC}"
+    
+    cat >> /etc/sysctl.conf <<EOF
+# UDP optimization
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
+net.core.netdev_max_backlog = 16384
+net.core.somaxconn = 8192
+net.ipv4.udp_mem = 8388608 12582912 16777216
+EOF
+
+    sysctl -p
+}
+
+# Function to optimize MTU
+optimize_mtu() {
+    echo -e "${GREEN}Optimizing MTU settings...${NC}"
+    
+    # Get main interface
+    INTERFACE=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
+    
+    # Test optimal MTU (starting from 1500)
+    CURRENT_MTU=1500
+    OPTIMAL_MTU=$CURRENT_MTU
+    
+    while [ $CURRENT_MTU -gt 1000 ]; do
+        if ping -c 1 -M do -s $((CURRENT_MTU - 28)) google.com >/dev/null 2>&1; then
+            OPTIMAL_MTU=$CURRENT_MTU
+            break
+        fi
+        CURRENT_MTU=$((CURRENT_MTU - 10))
+    done
+    
+    # Set optimal MTU
+    ip link set dev $INTERFACE mtu $OPTIMAL_MTU
+    
+    # Make MTU setting persistent
+    cat > /etc/network/if-up.d/mtu <<EOF
+#!/bin/sh
+ip link set dev $INTERFACE mtu $OPTIMAL_MTU
+EOF
+    chmod +x /etc/network/if-up.d/mtu
+}
+
+# Add these lines after the existing package installation
+echo -e "${GREEN}Optimizing network performance...${NC}"
+optimize_network_speed
+optimize_udp_performance
+optimize_mtu
+
+# Add bandwidth monitoring tool
+apt-get install -y vnstat
+systemctl enable vnstat
+systemctl start vnstat
+
+# Create a speed test function
+cat > /usr/local/bin/speedtest <<EOF
+#!/bin/bash
+echo "Running speed test..."
+speedtest-cli --simple
+echo ""
+echo "Current network usage:"
+vnstat -h
+EOF
+chmod +x /usr/local/bin/speedtest
+
+# Add to the menu.sh script (add this option in the System Menu section):
+echo -e "${CYAN}[30]${NC} • Run Speed Test"

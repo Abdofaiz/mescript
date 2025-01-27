@@ -967,7 +967,9 @@ while true; do
     echo -e "${CYAN}[28]${NC} • Stop UDP Custom"
     echo -e "${CYAN}[29]${NC} • Restart UDP Custom"
     echo -e ""
-    read -p "Select menu [1-29]: " choice
+    echo -e "${CYAN}[30]${NC} • Run Speed Test"
+    echo -e ""
+    read -p "Select menu [1-30]: " choice
 
     case $choice in
         1) 
@@ -1102,8 +1104,14 @@ while true; do
             restart_udp_custom
             press_enter
             ;;
+        30)
+            clear
+            echo -e "${GREEN}=== Network Speed Test ===${NC}"
+            speedtest
+            press_enter
+            ;;
         *)
-            echo -e "${RED}Please enter a number between 1 and 29${NC}"
+            echo -e "${RED}Please enter a number between 1 and 30${NC}"
             press_enter
             ;;
     esac
