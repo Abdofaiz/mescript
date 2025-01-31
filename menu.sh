@@ -1032,40 +1032,39 @@ show_service_status() {
 
 # Function to get system information
 get_system_info() {
-    # Get IP addresses
-    IPVPS=$(curl -s ipv4.icanhazip.com)
+    # Get IP addresses (with timeout to prevent hanging)
+    IPVPS=$(curl -s --max-time 5 ipv4.icanhazip.com || echo "Unable to get IP")
     
-    # Get CPU load
-    CPU_LOAD=$(uptime | awk -F'load average:' '{print $2}' | awk -F',' '{print $1}' | tr -d ' ')
+    # Get CPU load (simplified for reliability)
+    CPU_LOAD=$(cat /proc/loadavg | awk '{print $1}')
     
-    # Get RAM usage
-    TOTAL_RAM=$(free -m | awk '/Mem:/ {print $2}')
-    USED_RAM=$(free -m | awk '/Mem:/ {print $3}')
-    RAM_PERCENT=$((USED_RAM * 100 / TOTAL_RAM))
+    # Get RAM usage (simplified calculation)
+    TOTAL_RAM=$(free -m | grep Mem | awk '{print $2}')
+    USED_RAM=$(free -m | grep Mem | awk '{print $3}')
+    RAM_PERCENT=$(( (USED_RAM * 100) / TOTAL_RAM ))
     
     # Get domain if exists
-    if [ -f "/etc/vps/domain" ]; then
-        DOMAIN=$(cat /etc/vps/domain)
-    else
-        DOMAIN="Not Set"
-    fi
+    DOMAIN=$(cat /etc/vps/domain 2>/dev/null || echo "Not Set")
+    
+    # Get system uptime
+    UPTIME=$(uptime -p | cut -d " " -f 2-)
 }
 
-# Main menu with system info
+# Main menu display
 show_main_menu() {
     clear
     get_system_info
     
     echo -e "${GREEN}=================================================${NC}"
-    echo -e "${YELLOW}                VPS Control Panel                ${NC}"
-    echo -e "${YELLOW}                      FAIZ-VPN                     ${NC}"
-
+    echo -e "${GREEN}║                  ${YELLOW}• FAIZ-VPN •                  ${GREEN}║${NC}"
+    echo -e "${GREEN}║              ${YELLOW}PREMIUM VPS MANAGER              ${GREEN}║${NC}"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}VPS Information${NC}"
     echo -e "${GREEN}- IP VPS        :${NC} $IPVPS"
     echo -e "${GREEN}- Domain        :${NC} $DOMAIN"
     echo -e "${GREEN}- CPU Load      :${NC} $CPU_LOAD"
     echo -e "${GREEN}- RAM Usage     :${NC} $USED_RAM MB / $TOTAL_RAM MB ($RAM_PERCENT%)"
+    echo -e "${GREEN}- Uptime        :${NC} $UPTIME"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${GREEN}1.${NC} SSH & OpenVPN Menu"
     echo -e "${GREEN}2.${NC} Xray Menu"
@@ -1076,6 +1075,8 @@ show_main_menu() {
     echo -e "${GREEN}7.${NC} BadVPN Manager"
     echo -e "${RED}8.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${GREEN}║            ${YELLOW}Telegram: @faizvpn               ${GREEN}║${NC}"
     echo -e "${GREEN}=================================================${NC}"
 }
 
