@@ -33,7 +33,7 @@ add_user() {
     useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
     
-    send_message "$chat_id" "✅ User created successfully!\n\nUsername: $username\nPassword: $password\nDuration: $duration days"
+    send_message "$chat_id" "✅ Account Created Successfully\n\n👤 Username: $username\n🔑 Password: $password\n⏱ Duration: $duration days\n\n🌐 Server Details:\nIP: $(curl -s ipv4.icanhazip.com)\nDomain: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')"
 }
 
 # Function to remove user
@@ -41,8 +41,17 @@ remove_user() {
     local chat_id=$1
     local username=$2
     
-    userdel -r $username 2>/dev/null
-    send_message "$chat_id" "✅ User $username has been removed"
+    if [ -z "$username" ]; then
+        send_message "$chat_id" "❌ Usage: /removeuser <username>\n\nExample: /removeuser john"
+        return 1
+    fi
+    
+    if id "$username" &>/dev/null; then
+        userdel -r $username 2>/dev/null
+        send_message "$chat_id" "✅ User $username has been removed successfully"
+    else
+        send_message "$chat_id" "❌ User $username does not exist"
+    fi
 }
 
 # Function to check user status
@@ -50,14 +59,23 @@ check_user_status() {
     local chat_id=$1
     local username=$2
     
-    local expiry=$(chage -l $username | grep "Account expires" | cut -d: -f2)
-    local status="Active"
-    
-    if [ $(date -d "$expiry" +%s) -lt $(date +%s) ]; then
-        status="Expired"
+    if [ -z "$username" ]; then
+        send_message "$chat_id" "❌ Usage: /status <username>\n\nExample: /status john"
+        return 1
     fi
     
-    send_message "$chat_id" "👤 User: $username\n📅 Expiry: $expiry\n📊 Status: $status"
+    if id "$username" &>/dev/null; then
+        local expiry=$(chage -l $username | grep "Account expires" | cut -d: -f2)
+        local status="🟢 Active"
+        
+        if [ $(date -d "$expiry" +%s) -lt $(date +%s) ]; then
+            status="🔴 Expired"
+        fi
+        
+        send_message "$chat_id" "📊 Account Status\n\n👤 Username: $username\n📅 Expiry: $expiry\n📊 Status: $status"
+    else
+        send_message "$chat_id" "❌ User $username does not exist"
+    fi
 }
 
 # Function to get server status
@@ -67,8 +85,15 @@ server_status() {
     local cpu_load=$(cat /proc/loadavg | awk '{print $1}')
     local memory=$(free -m | grep Mem | awk '{printf("%.2f%%", $3/$2*100)}')
     local disk=$(df -h / | awk 'NR==2 {print $5}')
+    local uptime=$(uptime -p)
     
-    send_message "$chat_id" "🖥 Server Status\n\n📊 CPU Load: $cpu_load\n💾 Memory Usage: $memory\n💿 Disk Usage: $disk"
+    send_message "$chat_id" "🖥 Server Status\n\n📊 CPU Load: $cpu_load\n💾 Memory Usage: $memory\n💿 Disk Usage: $disk\n⏰ Uptime: $uptime\n\n🌐 Server Info:\nIP: $(curl -s ipv4.icanhazip.com)\nDomain: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')"
+}
+
+# Function to show help message
+show_help() {
+    local chat_id=$1
+    send_message "$chat_id" "👋 Welcome to VPS Management Bot!\n\n📝 Available Commands:\n\n/adduser - Create new account\nFormat: /adduser username password days\n\n/removeuser - Delete account\nFormat: /removeuser username\n\n/status - Check account status\nFormat: /status username\n\n/server - View server status\n\n💡 Need help? Contact @faizvpn"
 }
 
 # Main bot loop
@@ -77,11 +102,8 @@ process_message() {
     local message=$2
     
     case $message in
-        "/start")
-            send_message "$chat_id" "Welcome to FAIZ-VPN Management Bot!\n\nAvailable Commands:\n\n/adduser <username> <password> <duration> - Add new user\n/removeuser <username> - Remove user\n/status <username> - Check user status\n/server - Check server status"
-            ;;
-        "/adduser")
-            send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
+        "/start"|"/help")
+            show_help "$chat_id"
             ;;
         "/adduser "*)
             local params=(${message#"/adduser "})
@@ -91,15 +113,9 @@ process_message() {
                 send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
             fi
             ;;
-        "/removeuser")
-            send_message "$chat_id" "❌ Usage: /removeuser <username>\n\nExample: /removeuser john"
-            ;;
         "/removeuser "*)
             local username=${message#"/removeuser "}
             remove_user "$chat_id" "$username"
-            ;;
-        "/status")
-            send_message "$chat_id" "❌ Usage: /status <username>\n\nExample: /status john"
             ;;
         "/status "*)
             local username=${message#"/status "}
@@ -109,17 +125,15 @@ process_message() {
             server_status "$chat_id"
             ;;
         *)
-            send_message "$chat_id" "❌ Unknown command.\n\nAvailable Commands:\n/start - Show all commands\n/adduser - Add new user\n/removeuser - Remove user\n/status - Check user status\n/server - Check server status"
+            send_message "$chat_id" "❌ Unknown command\n\n📝 Available Commands:\n/start - Show menu\n/adduser - Create account\n/removeuser - Delete account\n/status - Check account\n/server - Server status\n\n💡 Need help? Contact @faizvpn"
             ;;
     esac
 }
 
 # Start webhook or polling
 if [ "$1" = "webhook" ]; then
-    # Setup webhook (if you want to use webhook instead of polling)
     curl -F "url=https://your-domain.com/webhook" "$API_URL/setWebhook"
 else
-    # Use polling
     offset=0
     while true; do
         updates=$(curl -s "$API_URL/getUpdates?offset=$offset&timeout=60")
