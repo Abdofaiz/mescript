@@ -1030,11 +1030,40 @@ show_service_status() {
     read -n 1 -s -r -p "Press any key to return to menu"
 }
 
-# Main menu loop
-while true; do
+# Function to get system information
+get_system_info() {
+    # Get IP addresses
+    IPVPS=$(curl -s ipv4.icanhazip.com)
+    
+    # Get CPU load
+    CPU_LOAD=$(uptime | awk -F'load average:' '{print $2}' | awk -F',' '{print $1}' | tr -d ' ')
+    
+    # Get RAM usage
+    TOTAL_RAM=$(free -m | awk '/Mem:/ {print $2}')
+    USED_RAM=$(free -m | awk '/Mem:/ {print $3}')
+    RAM_PERCENT=$((USED_RAM * 100 / TOTAL_RAM))
+    
+    # Get domain if exists
+    if [ -f "/etc/vps/domain" ]; then
+        DOMAIN=$(cat /etc/vps/domain)
+    else
+        DOMAIN="Not Set"
+    fi
+}
+
+# Main menu with system info
+show_main_menu() {
     clear
+    get_system_info
+    
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}                VPS Control Panel                ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}VPS Information${NC}"
+    echo -e "${GREEN}- IP VPS        :${NC} $IPVPS"
+    echo -e "${GREEN}- Domain        :${NC} $DOMAIN"
+    echo -e "${GREEN}- CPU Load      :${NC} $CPU_LOAD"
+    echo -e "${GREEN}- RAM Usage     :${NC} $USED_RAM MB / $TOTAL_RAM MB ($RAM_PERCENT%)"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${GREEN}1.${NC} SSH & OpenVPN Menu"
     echo -e "${GREEN}2.${NC} Xray Menu"
@@ -1046,8 +1075,13 @@ while true; do
     echo -e "${RED}8.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
     echo -e "${GREEN}=================================================${NC}"
-    read -p "Select menu: " menu_option
+}
 
+# Main script execution
+while true; do
+    show_main_menu
+    read -p "Select menu: " menu_option
+    
     case $menu_option in
         1)
             clear
@@ -1245,4 +1279,7 @@ while true; do
             press_enter
             ;;
     esac
+    
+    # Add a small delay before showing menu again
+    sleep 1
 done 
