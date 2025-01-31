@@ -1467,7 +1467,7 @@ fix_stunnel() {
     # Create proper stunnel config directory if it doesn't exist
     mkdir -p /etc/stunnel
 
-    # Create proper stunnel config
+    # Create proper stunnel config with improved settings
     cat > /etc/stunnel/stunnel.conf <<EOF
 pid = /var/run/stunnel4.pid
 cert = /etc/stunnel/stunnel.pem
@@ -1475,6 +1475,11 @@ client = no
 socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
 TIMEOUTclose = 0
+debug = 7
+sslVersion = all
+ciphers = ALL:!ADH:!LOW:!SSLv2:!SSLv3:!MD5:!RC4
+options = NO_SSLv2
+options = NO_SSLv3
 
 [dropbear]
 accept = 443
@@ -1486,20 +1491,24 @@ accept = 777
 connect = 127.0.0.1:22
 TIMEOUTidle = 300
 
+[openssh80]
+accept = 80
+connect = 127.0.0.1:22
+TIMEOUTidle = 300
+
 [openvpn]
 accept = 442
 connect = 127.0.0.1:1194
 TIMEOUTidle = 300
 EOF
 
-    # Create SSL certificate if it doesn't exist
-    if [ ! -f "/etc/stunnel/stunnel.pem" ]; then
-        echo -e "\n${YELLOW}Creating new SSL Certificate...${NC}"
-        openssl genrsa -out /etc/stunnel/stunnel.key 2048
-        openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=$(curl -s ipv4.icanhazip.com)"
-        openssl x509 -req -days 3650 -in /etc/stunnel/stunnel.csr -signkey /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt
-        cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
-    fi
+    # Create SSL certificate with proper settings
+    echo -e "\n${YELLOW}Creating new SSL Certificate...${NC}"
+    openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 \
+        -keyout /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt \
+        -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=$(curl -s ipv4.icanhazip.com)"
+    
+    cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
 
     # Fix permissions
     chmod 600 /etc/stunnel/stunnel.pem
@@ -1507,7 +1516,7 @@ EOF
     # Enable stunnel in default config
     echo "ENABLED=1" > /etc/default/stunnel4
 
-    # Create systemd service file
+    # Create systemd service file with proper settings
     cat > /etc/systemd/system/stunnel4.service <<EOF
 [Unit]
 Description=SSL tunnel for network daemons
@@ -1519,6 +1528,8 @@ Type=forking
 ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
 ExecStop=/usr/bin/pkill stunnel4
 TimeoutSec=600
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
@@ -1529,7 +1540,7 @@ EOF
     sysctl -w net.ipv4.tcp_window_scaling=1
     sysctl -w net.ipv4.tcp_sack=1
     sysctl -w net.ipv4.tcp_fin_timeout=30
-    sysctl -w net.ipv4.tcp_keepalive_time=1200
+    sysctl -w net.ipv4.tcp_keepalive_time=60
     sysctl -w net.ipv4.tcp_max_syn_backlog=4096
 
     # Reload systemd and restart stunnel
@@ -1543,6 +1554,7 @@ EOF
         echo -e "\n${YELLOW}Port Information:${NC}"
         echo -e "• SSL/TLS Dropbear : 443"
         echo -e "• SSL/TLS OpenSSH  : 777"
+        echo -e "• SSL/TLS OpenSSH  : 80"
         echo -e "• SSL/TLS OpenVPN  : 442"
         
         # Show connection status
@@ -1560,7 +1572,7 @@ EOF
     fi
 }
 
-# Add this function to menu.sh
+# Update the fix_ssh_config function
 fix_ssh_config() {
     clear
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -1570,7 +1582,7 @@ fix_ssh_config() {
     # Backup original config
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
-    # Update SSH configuration
+    # Update SSH configuration with better keepalive settings
     cat > /etc/ssh/sshd_config <<EOF
 Port 22
 Protocol 2
@@ -1578,9 +1590,10 @@ HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 UsePAM yes
-ClientAliveInterval 120
-ClientAliveCountMax 3
-MaxAuthTries 6
+ClientAliveInterval 30
+ClientAliveCountMax 6
+TCPKeepAlive yes
+MaxAuthTries 10
 PubkeyAuthentication yes
 PermitRootLogin yes
 PasswordAuthentication yes
@@ -1591,15 +1604,31 @@ X11Forwarding yes
 PrintMotd no
 AcceptEnv LANG LC_*
 Subsystem sftp /usr/lib/openssh/sftp-server
+UseDNS no
+AddressFamily inet
 EOF
 
     # Restart SSH service
     systemctl restart ssh
 
+    # Update system TCP keepalive settings
+    cat > /etc/sysctl.d/99-sysctl.conf <<EOF
+net.ipv4.tcp_keepalive_time = 60
+net.ipv4.tcp_keepalive_intvl = 10
+net.ipv4.tcp_keepalive_probes = 6
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_rfc1337 = 1
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_max_syn_backlog = 4096
+EOF
+
+    sysctl -p /etc/sysctl.d/99-sysctl.conf
+
     echo -e "\n${GREEN}SSH configuration has been updated!${NC}"
-    echo -e "• ClientAliveInterval: 120 seconds"
-    echo -e "• ClientAliveCountMax: 3"
-    echo -e "• MaxAuthTries: 6"
+    echo -e "• ClientAliveInterval: 30 seconds"
+    echo -e "• ClientAliveCountMax: 6"
+    echo -e "• TCPKeepAlive: enabled"
+    echo -e "• System TCP keepalive settings optimized"
 }
 
 # Main menu display
