@@ -23,15 +23,10 @@ send_message() {
 
 # Function to get server details
 get_server_details() {
-    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
     local ip=$(curl -s ipv4.icanhazip.com)
-    
-    # Get ports from configuration
-    local ssl_port=$(cat /etc/vps/ssl.conf 2>/dev/null || echo '443')
-    local ssh_port=$(cat /etc/vps/ssh.conf 2>/dev/null || echo '22')
-    local ws_port=$(cat /etc/vps/ws.conf 2>/dev/null || echo '80')
-    local udp_port=$(cat /etc/vps/udp.conf 2>/dev/null || echo '7300')
-    local badvpn_port=$(cat /etc/vps/badvpn.conf 2>/dev/null || echo '7300')
+    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
+    local username=$1
+    local password=$2
     
     echo "\
 🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
@@ -39,13 +34,15 @@ get_server_details() {
 🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $domain
 
 📡 𝙋𝙤𝙧𝙩 𝙄𝙣𝙛𝙤:
-🔒 𝙎𝙎𝙇: $domain:$ssl_port
-🔑 𝙎𝙎𝙃: $ip:$ssh_port
-🌐 𝙒𝙚𝙗𝙨𝙤𝙘𝙠𝙚𝙩: $domain:$ws_port
-🚀 𝘽𝙖𝙙𝙫𝙥𝙣: $ip:$badvpn_port
+🔒 𝙎𝙎𝙇: 443
+🌐 𝙒𝙚𝙗𝙨𝙤𝙘𝙠𝙚𝙩: 80, 443
+🔰 𝙐𝘿𝙋 𝘾𝙪𝙨𝙩𝙤𝙢: $ip:1-65535@$username:$password
 
-🔰 𝙐𝘿𝙋 𝘾𝙤𝙣𝙛𝙞𝙜:
-$ip:$udp_port@\$username:\$password"
+💎 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨:
+• SSL/TLS : 443
+• Websocket SSL : 443
+• Websocket HTTP : 80
+• UDP Custom : 1-65535"
 }
 
 # Function to create user
@@ -59,8 +56,8 @@ create_user() {
     useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
     
-    # Get server details with actual username and password
-    local server_details=$(get_server_details | sed "s/\$username/$username/g" | sed "s/\$password/$password/g")
+    # Get server details with username and password
+    local server_details=$(get_server_details "$username" "$password")
     
     send_message "$chat_id" "\
 ━━━━━━━━━━━━━━━━━━━━━
@@ -71,7 +68,7 @@ create_user() {
 
 👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username
 🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password
-⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: $duration days
+⏱ 𝘿𝙪𝙧𝙖𝙩𝙞��𝙣: $duration days
 📅 𝙀𝙭𝙥𝙞𝙧𝙮: $(date -d "+$duration days" +"%Y-%m-%d")
 
 $server_details
