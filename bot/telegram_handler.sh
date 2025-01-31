@@ -201,10 +201,7 @@ show_welcome() {
      𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
 
           🗑️ /delete
-       𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧
-
-          👥 /list
-       𝙇𝙞𝙨𝙩 𝘼𝙡𝙡 𝙐𝙨𝙚𝙧𝙨
+       𝙍��𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧
 
           ℹ️ /info
       𝙐𝙨𝙚𝙧 𝙄𝙣𝙛𝙤𝙧𝙢𝙖𝙩𝙞𝙤𝙣
@@ -292,9 +289,9 @@ restart_services() {
 
        ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
 
-    ✅ 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨 ��𝙚𝙨𝙩𝙖𝙧𝙩𝙚𝙙!
+    ✅ 𝙎��𝙧𝙫𝙞𝙘𝙚𝙨 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
 
-      📋 ��𝙧𝙫𝙞𝙘𝙚�� 𝙇𝙞𝙨𝙩 𝙇𝙞𝙨�� 𝙗𝙖𝙘𝙠 𝙨𝙤𝙤𝙣
+      📋 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙇𝙞𝙨𝙩 𝙇𝙞𝙨𝙩 𝙗𝙖𝙘𝙠 𝙨𝙤𝙤𝙣
          • SSH
          • Dropbear
          • Stunnel4
@@ -316,7 +313,7 @@ reboot_server() {
 
        ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
 
-    🔌 𝙍𝙚𝙗𝙤𝙤𝙩𝙞𝙣𝙜 𝙎𝙚𝙧��𝙚��...
+    🔌 𝙍𝙚����𝙤��𝙞𝙣𝙜 𝙎𝙚𝙧𝙫𝙚𝙧...
     
     ⏳ 𝙡𝙚𝙖𝙨𝙚 𝙬𝙖𝙞 1-2 𝙢𝙞𝙣𝙪𝙩𝙚𝙨
     
@@ -329,88 +326,6 @@ EOF
     
     # Schedule reboot after message is sent
     (sleep 2 && reboot) &
-}
-
-# Function to list all users
-list_users() {
-    local chat_id=$1
-    
-    # Get list of all non-system users
-    local users=$(awk -F: '$3 >= 1000 && $3 != 65534 {print $1}' /etc/passwd)
-    local user_count=$(echo "$users" | wc -l)
-    
-    local user_list=""
-    local count=1
-    
-    while IFS= read -r username; do
-        if [ ! -z "$username" ]; then
-            local expiry=$(chage -l "$username" | grep "Account expires" | cut -d: -f2)
-            local status="🟢"
-            if [ $(date -d "$expiry" +%s) -lt $(date +%s) ]; then
-                status="🔴"
-            fi
-            user_list+="$count. $status $username (Exp: $expiry)\n"
-            count=$((count + 1))
-        fi
-    done <<< "$users"
-    
-    send_message "$chat_id" "$(cat << EOF
-     ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-👥 𝙐𝙨𝙚𝙧 𝙇𝙞𝙨�� 𝙏𝙤𝙩 𝙐𝙨𝙚𝙧𝙨: $user_count
-
-$user_list
-🟢 Active  🔴 Expired
-
-💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━
-EOF
-)"
-}
-
-# Function to show user info
-show_user_info() {
-    local chat_id=$1
-    local username=$2
-    
-    if [ -z "$username" ]; then
-        send_message "$chat_id" "❌ Usage: /info <username>\n\nExample: /info john"
-        return 1
-    fi
-    
-    if id "$username" &>/dev/null; then
-        local expiry=$(chage -l "$username" | grep "Account expires" | cut -d: -f2)
-        local status="🟢 Active"
-        if [ $(date -d "$expiry" +%s) -lt $(date +%s) ]; then
-            status="🔴 Expired"
-        fi
-        
-        # Get login history
-        local login_history=$(last "$username" -n 5 | grep -v "reboot" | awk '{print $1,$3,$4,$5,$6,$7}')
-        
-        send_message "$chat_id" "$(cat << EOF
-     ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-👤 𝙐𝙨𝙚𝙧 𝙄𝙣𝙛𝙤𝙧𝙢𝙖𝙩𝙞𝙤𝙣:
-
-📝 Username: $username
-📅 Expiry: $expiry
-📊 Status: $status
-
-📋 Recent Logins:
-$login_history
-
-💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━
-EOF
-)"
-    else
-        send_message "$chat_id" "❌ User $username does not exist"
-    fi
 }
 
 # Process messages
@@ -446,9 +361,6 @@ process_message() {
                 "/help")
                     show_help "$chat_id"
                     ;;
-                "/list")
-                    list_users "$chat_id"
-                    ;;
                 "/info")
                     send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝘾𝙝𝙚𝙘𝙠:"
                     user_states[$chat_id]="waiting_info_username"
@@ -475,10 +387,6 @@ process_message() {
             user_states[$chat_id]="none"
             unset user_data[$chat_id,username]
             unset user_data[$chat_id,password]
-            ;;
-        "waiting_info_username")
-            show_user_info "$chat_id" "$message"
-            user_states[$chat_id]="none"
             ;;
     esac
 }
