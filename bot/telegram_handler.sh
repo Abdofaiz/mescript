@@ -17,6 +17,13 @@ source $BOT_CONFIG
 declare -A USER_STATES
 declare -A TEMP_DATA
 
+# Add these at the start of the file
+LOG_FILE="/var/log/telegram-bot.log"
+
+log_debug() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
 # Function to create SSH account
 create_account() {
     local chat_id=$1
@@ -334,22 +341,36 @@ handle_command() {
     esac
 }
 
-# Update the main loop to handle messages
+# Update the main loop with logging
 while true; do
-    updates=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$((offset + 1))")
+    log_debug "Getting updates with offset $offset"
+    updates=$(curl -s "$API_URL/getUpdates?offset=$offset&timeout=60")
     
-    while read -r update_id chat_id message; do
-        if [ -n "$update_id" ]; then
-            offset=$update_id
-            if [[ "$message" == /* ]]; then
-                # It's a command
-                handle_command "$chat_id" "$message"
-            else
-                # It's a regular message
-                handle_command "$chat_id" "" "$message"
+    if ! echo "$updates" | jq -e '.result' >/dev/null 2>&1; then
+        log_debug "Error: Invalid updates response"
+        log_debug "Response: $updates"
+        sleep 5
+        continue
+    fi
+    
+    # Process updates with logging
+    while read -r update; do
+        if [ -n "$update" ]; then
+            log_debug "Processing update: $update"
+            chat_id=$(echo "$update" | jq -r '.message.chat.id')
+            message=$(echo "$update" | jq -r '.message.text')
+            update_id=$(echo "$update" | jq -r '.update_id')
+            
+            log_debug "Chat ID: $chat_id, Message: $message"
+            
+            if [ -n "$message" ] && [ "$message" != "null" ]; then
+                process_message "$chat_id" "$message"
             fi
+            
+            offset=$((update_id + 1))
+            log_debug "New offset: $offset"
         fi
-    done < <(echo "$updates" | jq -r '.result[] | "\(.update_id) \(.message.chat.id) \(.message.text)"')
+    done < <(echo "$updates" | jq -c '.result[]')
     
     sleep 1
 done
