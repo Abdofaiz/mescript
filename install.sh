@@ -104,15 +104,19 @@ cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.pem > /etc/stunnel/stunnel.pem
 
 # Configure Stunnel
 cat > /etc/stunnel/stunnel.conf << EOF
-pid = /var/run/stunnel.pid
+pid = /var/run/stunnel4.pid
 cert = /etc/stunnel/stunnel.pem
 client = no
 socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
 
 [dropbear]
-accept = 443
-connect = 127.0.0.1:80
+accept = 447
+connect = 127.0.0.1:143
+
+[openvpn]
+accept = 587
+connect = 127.0.0.1:1194
 EOF
 
 # Configure Squid
@@ -201,11 +205,41 @@ EOF
 systemctl daemon-reload
 systemctl enable iptables-restore
 
-# Install menu script
+# Install menu script properly
 echo -e "${YELLOW}Installing menu script...${NC}"
-wget -O /usr/local/bin/menu.sh https://raw.githubusercontent.com/Abdofaiz/mescript/main/menu.sh
-chmod +x /usr/local/bin/menu.sh
-ln -sf /usr/local/bin/menu.sh /usr/bin/menu
+
+# Create menu directory
+mkdir -p /usr/local/bin/menu
+
+# Download menu components
+wget -O /usr/local/bin/menu/menu.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/menu.sh"
+wget -O /usr/local/bin/menu/ssh.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/ssh.sh"
+wget -O /usr/local/bin/menu/system.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/system.sh"
+wget -O /usr/local/bin/menu/vless.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/vless.sh"
+wget -O /usr/local/bin/menu/vmess.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/vmess.sh"
+
+# Make scripts executable
+chmod +x /usr/local/bin/menu/*.sh
+
+# Create main menu command
+cat > /usr/bin/menu << 'EOF'
+#!/bin/bash
+/usr/local/bin/menu/menu.sh
+EOF
+
+# Make menu command executable
+chmod +x /usr/bin/menu
+
+# Create aliases for quick access
+cat > /root/.bash_aliases << 'EOF'
+alias m="menu"
+alias menu="menu"
+EOF
+
+# Load new aliases
+source /root/.bash_aliases
+
+echo -e "${GREEN}Menu installation completed!${NC}"
 
 # Create VPS info directory if it doesn't exist
 mkdir -p /etc/vps
@@ -215,4 +249,104 @@ echo "Installation Date: $(date '+%Y-%m-%d')" > /etc/vps/install-date
 
 # Final setup
 echo -e "${GREEN}Installation completed!${NC}"
-echo -e "${YELLOW}Type 'menu' to access the control panel${NC}" 
+echo -e "${YELLOW}Type 'menu' to access the control panel${NC}"
+
+# Add these service installations and configurations after the initial package installation:
+
+# Install Nginx
+apt install -y nginx
+systemctl enable nginx
+systemctl start nginx
+
+# Configure Dropbear
+cat > /etc/default/dropbear << 'EOF'
+NO_START=0
+DROPBEAR_PORT=143
+DROPBEAR_EXTRA_ARGS="-p 50000"
+DROPBEAR_BANNER="/etc/issue.net"
+DROPBEAR_RECEIVE_WINDOW=65536
+EOF
+
+# Install BadVPN
+wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/Abdofaiz/mescript/main/badvpn-udpgw64"
+chmod +x /usr/bin/badvpn-udpgw
+
+# Create BadVPN service
+cat > /etc/systemd/system/badvpn.service << 'EOF'
+[Unit]
+Description=BadVPN UDP Gateway
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/badvpn-udpgw --listen-addr 127.0.0.1:7300
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Configure WebSocket
+cat > /etc/nginx/conf.d/ws.conf << 'EOF'
+server {
+    listen 80;
+    server_name 127.0.0.1;
+    
+    location / {
+        proxy_pass http://127.0.0.1:700;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+}
+EOF
+
+# Create WebSocket service
+cat > /etc/systemd/system/ws-ssh.service << 'EOF'
+[Unit]
+Description=WebSocket SSH Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m websockify --web=/usr/share/websockify 700 127.0.0.1:143
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Install WebSocket dependencies
+apt install -y python3-websockify
+
+# Enable and start all services
+systemctl daemon-reload
+
+services=(
+    "nginx"
+    "dropbear"
+    "stunnel4"
+    "badvpn"
+    "ws-ssh"
+    "xray"
+    "squid"
+)
+
+for service in "${services[@]}"; do
+    echo "Starting $service..."
+    systemctl enable $service
+    systemctl restart $service
+    sleep 1
+done
+
+# Verify services are running
+echo "Checking service status..."
+for service in "${services[@]}"; do
+    if systemctl is-active --quiet $service; then
+        echo "$service is running"
+    else
+        echo "$service failed to start"
+        systemctl status $service
+    fi
+done 
