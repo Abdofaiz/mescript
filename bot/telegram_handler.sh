@@ -424,39 +424,22 @@ EOF
 )"
 }
 
-# Function to create Xray user
-create_xray_user() {
+# Function to create VLESS user
+create_vless_user() {
     local chat_id=$1
-    local protocol=$2
-    local username=$3
+    local username=$2
     
     # Generate UUID
     local uuid=$(uuidgen)
     local domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
     local exp_date=$(date -d "+30 days" +"%Y-%m-%d")
+    local port="8442"
+    local path="/vless"
     
-    if [[ "$protocol" == "vless" ]]; then
-        local port="8442"
-        local path="/vless"
-        local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
-        
-        # Add user to Xray config
-        local xray_config="/usr/local/etc/xray/config.json"
-        if [ -f "$xray_config" ]; then
-            # Create backup of current config
-            cp "$xray_config" "${xray_config}.bak"
-            
-            # Add VLESS user to config
-            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[] | select(.protocol == "vless") | .settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
-            mv "${xray_config}.tmp" "$xray_config"
-            
-            # Restart Xray service
-            systemctl restart xray
-            
-            # Save user info to database
-            echo "vless:${username}:${uuid}:${exp_date}" >> /etc/vps/users.db
-            
-            send_message "$chat_id" "$(cat << EOF
+    # Create VLESS config string
+    local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
+    
+    send_message "$chat_id" "$(cat << EOF
      ━━━━━━━━━━━━━━━━━━━━━
        🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
      ━━━━━━━━━━━━━━━━━━━━━
@@ -482,10 +465,6 @@ create_xray_user() {
 ━━━━━━━━━━━━━━━━━━━━━
 EOF
 )"
-        else
-            send_message "$chat_id" "❌ Error: Xray configuration file not found"
-        fi
-    fi
 }
 
 # Process messages
@@ -493,14 +472,24 @@ process_message() {
     local chat_id=$1
     local message=$2
     
+    # Get current state
+    local state=${user_states[$chat_id]:-"none"}
+    
+    case $state in
+        "waiting_vless_username")
+            create_vless_user "$chat_id" "$message"
+            user_states[$chat_id]="none"
+            return
+            ;;
+    esac
+    
     case $message in
+        "/start")
+            show_welcome "$chat_id"
+            ;;
         "/vless")
             send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
             user_states[$chat_id]="waiting_vless_username"
-            ;;
-        "/vmess")
-            create_xray_user "$chat_id" "vmess" "$message"
-            user_states[$chat_id]="none"
             ;;
         "/status")
             check_server_status "$chat_id"
@@ -519,28 +508,12 @@ process_message() {
             ;;
         "/delete")
             user_states[$chat_id]="waiting_delete_username"
-            send_message "$chat_id" "𝙎𝙚��𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
             ;;
         *)
-            send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡�� 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
-            ;;
-    esac
-    
-    # Get current state
-    local state=${user_states[$chat_id]:-"none"}
-    
-    case $state in
-        "waiting_vless_username")
-            if [[ -n "$message" ]]; then
-                create_xray_user "$chat_id" "vless" "$message"
-                user_states[$chat_id]="none"
-            else
-                send_message "$chat_id" "❌ Invalid username. Please try again."
+            if [[ "$state" == "none" ]]; then
+                send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
             fi
-            ;;
-        "waiting_delete_username")
-            delete_user "$chat_id" "$message"
-            user_states[$chat_id]="none"
             ;;
     esac
 }
