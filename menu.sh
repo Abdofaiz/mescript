@@ -928,6 +928,89 @@ check_service_status() {
     fi
 }
 
+# Function to install BadVPN
+install_badvpn() {
+    if [ ! -f "/usr/bin/badvpn-udpgw" ]; then
+        echo -e "${YELLOW}Installing BadVPN...${NC}"
+        wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/Abdofaiz/mescript/main/badvpn-udpgw64"
+        chmod +x /usr/bin/badvpn-udpgw
+        
+        # Create systemd service file
+        cat > /etc/systemd/system/badvpn.service << EOF
+[Unit]
+Description=BadVPN UDPGW Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 1000 --max-connections-for-client 100
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        systemctl daemon-reload
+        systemctl enable badvpn
+        systemctl start badvpn
+        echo -e "${GREEN}BadVPN installed successfully${NC}"
+    else
+        echo -e "${YELLOW}BadVPN is already installed${NC}"
+    fi
+}
+
+# Function to manage BadVPN
+manage_badvpn() {
+    clear
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}              BadVPN Management                  ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${GREEN}1.${NC} Install BadVPN"
+    echo -e "${GREEN}2.${NC} Start BadVPN"
+    echo -e "${GREEN}3.${NC} Stop BadVPN"
+    echo -e "${GREEN}4.${NC} Restart BadVPN"
+    echo -e "${GREEN}5.${NC} Check BadVPN Status"
+    echo -e "${GREEN}0.${NC} Back to Main Menu"
+    echo -e "${GREEN}=================================================${NC}"
+    read -p "Select option: " badvpn_option
+
+    case $badvpn_option in
+        1)
+            install_badvpn
+            ;;
+        2)
+            systemctl start badvpn
+            echo -e "${GREEN}BadVPN started${NC}"
+            ;;
+        3)
+            systemctl stop badvpn
+            echo -e "${YELLOW}BadVPN stopped${NC}"
+            ;;
+        4)
+            systemctl restart badvpn
+            echo -e "${GREEN}BadVPN restarted${NC}"
+            ;;
+        5)
+            if systemctl is-active --quiet badvpn; then
+                echo -e "${GREEN}BadVPN is running${NC}"
+                echo -e "Port: 7300"
+            else
+                echo -e "${RED}BadVPN is not running${NC}"
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            ;;
+    esac
+    read -n 1 -s -r -p "Press any key to continue"
+    manage_badvpn
+}
+
 # Function to display service statuses
 show_service_status() {
     clear
@@ -941,6 +1024,7 @@ show_service_status() {
     echo -e "${YELLOW}Xray          :${NC} $(check_service_status xray)"
     echo -e "${YELLOW}Nginx         :${NC} $(check_service_status nginx)"
     echo -e "${YELLOW}Squid         :${NC} $(check_service_status squid)"
+    echo -e "${YELLOW}BadVPN        :${NC} $(check_service_status badvpn)"
     echo -e "${GREEN}=================================================${NC}"
     echo ""
     read -n 1 -s -r -p "Press any key to return to menu"
@@ -958,7 +1042,8 @@ while true; do
     echo -e "${GREEN}4.${NC} System Information"
     echo -e "${GREEN}5.${NC} System Settings"
     echo -e "${GREEN}6.${NC} Service Status"
-    echo -e "${RED}7.${NC} Uninstall All Services"
+    echo -e "${GREEN}7.${NC} BadVPN Manager"
+    echo -e "${RED}8.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
     echo -e "${GREEN}=================================================${NC}"
     read -p "Select menu: " menu_option
@@ -1140,6 +1225,9 @@ while true; do
             show_service_status
             ;;
         7)
+            manage_badvpn
+            ;;
+        8)
             echo -e "${RED}Warning: This will uninstall all VPS services${NC}"
             read -p "Are you sure you want to continue? (y/n): " confirm
             if [[ $confirm == "y" || $confirm == "Y" ]]; then
