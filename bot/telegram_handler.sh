@@ -25,7 +25,22 @@ add_user() {
     local duration=$4
     
     if [ -z "$username" ] || [ -z "$password" ] || [ -z "$duration" ]; then
-        send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
+        send_message "$chat_id" "\
+━━━━━━━━━━━━━━━━━━━━━
+       🚀 FAIZ-VPN MANAGER BOT
+━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ Enter Username:
+Format: /adduser username
+
+2️⃣ Enter Password:
+Format: /adduser username password
+
+3️⃣ Enter Duration (days):
+Format: /adduser username password days
+
+Example: /adduser john pass123 30
+━━━━━━━━━━━━━━━━━━━━━"
         return 1
     fi
     
@@ -33,7 +48,24 @@ add_user() {
     useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
     
-    send_message "$chat_id" "✅ Account Created Successfully\n\n👤 Username: $username\n🔑 Password: $password\n⏱ Duration: $duration days\n\n🌐 Server Details:\nIP: $(curl -s ipv4.icanhazip.com)\nDomain: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')"
+    send_message "$chat_id" "\
+━━━━━━━━━━━━━━━━━━━━━
+       🚀 FAIZ-VPN MANAGER BOT
+━━━━━━━━━━━━━━━━━━━━━
+
+✅ Account Created Successfully!
+
+👤 Username: $username
+🔑 Password: $password
+⏱ Duration: $duration days
+
+🌐 Server Details:
+📍 IP: $(curl -s ipv4.icanhazip.com)
+🔗 Domain: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
+📅 Expiry: $(date -d "+$duration days" +"%Y-%m-%d")
+
+💡 Support: @faizvpn
+━━━━━━━━━━━━━━━━━━━━━"
 }
 
 # Function to remove user
@@ -102,16 +134,16 @@ show_help() {
 
 📝 Available Commands:
 
-/adduser - Create new account
+1️⃣ /adduser - Create new account
 Format: /adduser username password days
 
-/removeuser - Delete account
+2️⃣ /removeuser - Delete account
 Format: /removeuser username
 
-/status - Check account status
+3️⃣ /status - Check account status
 Format: /status username
 
-/server - View server status
+4️⃣ /server - View server status
 
 💡 Support: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
@@ -126,12 +158,42 @@ process_message() {
         "/start"|"/help")
             show_help "$chat_id"
             ;;
+        "/adduser")
+            send_message "$chat_id" "\
+━━━━━━━━━━━━━━━━━━━━━
+       🚀 FAIZ-VPN MANAGER BOT
+━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ Enter Username:
+Format: /adduser username
+
+2️⃣ Enter Password:
+Format: /adduser username password
+
+3️⃣ Enter Duration (days):
+Format: /adduser username password days
+
+Example: /adduser john pass123 30
+━━━━━━━━━━━━━━━━━━━━━"
+            ;;
         "/adduser "*)
             local params=(${message#"/adduser "})
             if [ ${#params[@]} -eq 3 ]; then
                 add_user "$chat_id" "${params[0]}" "${params[1]}" "${params[2]}"
             else
-                send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
+                send_message "$chat_id" "\
+━━━━━━━━━━━━━━━━━━━━━
+       🚀 FAIZ-VPN MANAGER BOT
+━━━━━━━━━━━━━━━━━━━━━
+
+❌ Incomplete Command
+
+1️⃣ Enter Username
+2️⃣ Enter Password
+3️⃣ Enter Duration (days)
+
+Example: /adduser john pass123 30
+━━━━━━━━━━━━━━━━━━━━━"
             fi
             ;;
         "/removeuser "*)
