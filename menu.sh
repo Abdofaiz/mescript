@@ -1053,7 +1053,8 @@ show_main_menu() {
     get_system_info
     
     echo -e "${GREEN}=================================================${NC}"
-    echo -e "${YELLOW}                VPS Control Panel                ${NC}"
+    echo -e "${YELLOW}                   FAIZ-VPN                     ${NC}"
+    echo -e "${YELLOW}              PREMIUM VPS MANAGER               ${NC}"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}VPS Information${NC}"
     echo -e "${GREEN}- IP VPS        :${NC} $IPVPS"
@@ -1070,6 +1071,8 @@ show_main_menu() {
     echo -e "${GREEN}7.${NC} BadVPN Manager"
     echo -e "${RED}8.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}           Telegram Support: @faizvpn           ${NC}"
     echo -e "${GREEN}=================================================${NC}"
 }
 
