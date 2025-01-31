@@ -467,7 +467,7 @@ EOF
 )"
 }
 
-# Process messages
+# Function to process messages
 process_message() {
     local chat_id=$1
     local message=$2
@@ -475,21 +475,37 @@ process_message() {
     # Get current state
     local state=${user_states[$chat_id]:-"none"}
     
+    # Handle states first
     case $state in
         "waiting_vless_username")
             create_vless_user "$chat_id" "$message"
             user_states[$chat_id]="none"
             return
             ;;
+        "waiting_vmess_username")
+            create_vmess_user "$chat_id" "$message"
+            user_states[$chat_id]="none"
+            return
+            ;;
+        "waiting_delete_username")
+            delete_user "$chat_id" "$message"
+            user_states[$chat_id]="none"
+            return
+            ;;
     esac
     
-    case $message in
+    # Handle commands
+    case "$message" in
         "/start")
             show_welcome "$chat_id"
             ;;
         "/vless")
             send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
             user_states[$chat_id]="waiting_vless_username"
+            ;;
+        "/vmess")
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
+            user_states[$chat_id]="waiting_vmess_username"
             ;;
         "/status")
             check_server_status "$chat_id"
@@ -503,17 +519,12 @@ process_message() {
         "/reboot")
             reboot_server "$chat_id"
             ;;
-        "/help")
-            show_help "$chat_id"
-            ;;
         "/delete")
-            user_states[$chat_id]="waiting_delete_username"
             send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+            user_states[$chat_id]="waiting_delete_username"
             ;;
         *)
-            if [[ "$state" == "none" ]]; then
-                send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
-            fi
+            show_welcome "$chat_id"
             ;;
     esac
 }
