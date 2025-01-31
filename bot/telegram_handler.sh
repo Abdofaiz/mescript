@@ -17,10 +17,10 @@ add_user() {
     local password=$3
     local duration=$4
     
-    if [[ -z "$username" || -z "$password" || -z "$duration" ]]; then
+    if [ -z "$username" ] || [ -z "$password" ] || [ -z "$duration" ]; then
         send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
         return 1
-    }
+    fi
     
     # Add user using your existing script
     useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
@@ -46,7 +46,7 @@ check_user_status() {
     local expiry=$(chage -l $username | grep "Account expires" | cut -d: -f2)
     local status="Active"
     
-    if [[ $(date -d "$expiry" +%s) < $(date +%s) ]]; then
+    if [ $(date -d "$expiry" +%s) -lt $(date +%s) ]; then
         status="Expired"
     fi
     
@@ -78,7 +78,7 @@ process_message() {
             ;;
         "/adduser "*)
             local params=(${message#"/adduser "})
-            if [[ ${#params[@]} == 3 ]]; then
+            if [ ${#params[@]} -eq 3 ]; then
                 add_user "$chat_id" "${params[0]}" "${params[1]}" "${params[2]}"
             else
                 send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
@@ -108,7 +108,7 @@ process_message() {
 }
 
 # Start webhook or polling
-if [[ $1 == "webhook" ]]; then
+if [ "$1" = "webhook" ]; then
     # Setup webhook (if you want to use webhook instead of polling)
     curl -F "url=https://your-domain.com/webhook" "$API_URL/setWebhook"
 else
