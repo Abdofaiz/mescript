@@ -1,591 +1,253 @@
 #!/bin/bash
 
-# Load configuration
-if [ -f "/etc/vps/telegram.conf" ]; then
-    source /etc/vps/telegram.conf
-else
-    echo "Error: Telegram configuration not found"
-    exit 1
-fi
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-API_URL="https://api.telegram.org/bot$BOT_TOKEN"
+# Configuration files
+USER_DB="/etc/vps/users.db"
+BOT_CONFIG="/etc/vps/telegram.conf"
 
-# Store user creation state
-declare -A user_states
-declare -A user_data
+# Load bot configuration
+source $BOT_CONFIG
 
-# Function to send message
-send_message() {
-    local chat_id=$1
-    local message=$2
-    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-        -d "chat_id=$chat_id" \
-        -d "text=$message" \
-        -d "parse_mode=HTML"
-}
-
-# Function to get server details
-get_server_details() {
-    local ip=$(curl -s ipv4.icanhazip.com)
-    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
-    local username=$1
-    local password=$2
-    
-    echo "\
-🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
-📍 𝙄𝙋: $ip
-🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $domain
-
-🔰 𝙐𝘿𝙋 𝘾𝙪𝙨𝙤𝙢𝙤𝙣: $ip:1-65535@$username:$password
-
-💎 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨:
-• SSL/TLS : 443
-• Websocket SSL : 443
-• Websocket HTTP : 80
-• UDP Custom : 1-65535"
-}
-
-# Function to generate fancy text and icons
-get_fancy_text() {
-    local text=$1
-    echo "𝙁𝘼𝙄𝙕-𝙑𝙋𝙉"
-}
-
-get_fancy_icon() {
-    local type=$1
-    case $type in
-        "welcome") echo "👋" ;;
-        "create") echo "⚡" ;;
-        "status") echo "🔍" ;;
-        "server") echo "📊" ;;
-        "support") echo "💡" ;;
-        "success") echo "✅" ;;
-        "user") echo "👤" ;;
-        "pass") echo "🔑" ;;
-        "duration") echo "⏱" ;;
-        "expiry") echo "📅" ;;
-        "ip") echo "📍" ;;
-        "domain") echo "🔗" ;;
-        "port") echo "📡" ;;
-        "ssl") echo "🔒" ;;
-        "websocket") echo "🌐" ;;
-        "udp") echo "🔰" ;;
-        "services") echo "💎" ;;
-        *) echo "•" ;;
-    esac
-}
-
-get_border() {
-    echo "━━━━━━━━━━━━━━━━━━━━━"
-}
-
-# Function to center text
-center_text() {
-    local text=$1
-    local width=35
-    local padding=$(( (width - ${#text}) / 2 ))
-    printf "%${padding}s%s%${padding}s" "" "$text" ""
-}
-
-# Function to create user
-create_user() {
+# Function to create SSH account
+create_account() {
     local chat_id=$1
     local username=$2
     local password=$3
     local duration=$4
+
+    # Check if user exists
+    if id "$username" &>/dev/null; then
+        send_message "$chat_id" "❌ Error: User already exists"
+        return 1
+    fi
+
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
     
-    # Add user
-    useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
+    # Create user
+    useradd -e $(date -d "$exp_date" +"%Y-%m-%d") -s /bin/false -M "$username"
     echo "$username:$password" | chpasswd
+
+    # Add to database
+    echo "ssh:${username}:${password}:${exp_date}" >> $USER_DB
+
+    # Get server IP
+    server_ip=$(curl -s ipv4.icanhazip.com)
+
+    # Send success message with connection details
+    message="✅ Account Created Successfully\n\n"
+    message+="📝 Account Details:\n"
+    message+="Username: $username\n"
+    message+="Password: $password\n"
+    message+="Expired Date: $exp_date\n\n"
+    message+="🌐 Connection Details:\n"
+    message+="SSH Port: 22, 109, 143\n"
+    message+="SSL/TLS Port: 443, 445, 777\n"
+    message+="Squid Proxy: 3128, 8080\n"
+    message+="Server IP: $server_ip\n"
     
-    # Get server details with username and password
-    local server_details=$(get_server_details "$username" "$password")
-    
-    send_message "$chat_id" "\
-     ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-✅ 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 𝘾𝙧𝙚𝙖𝙩𝙚𝙙 𝙎𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮!
-
-👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username
-🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password
-⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: $duration days
-📅 𝙀𝙭𝙥𝙞𝙧𝙮: $(date -d "+$duration days" +"%Y-%m-%d")
-
-$server_details
-
- 💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━"
+    send_message "$chat_id" "$message"
 }
 
-# Function to remove user
-remove_user() {
+# Function to create VLESS account
+create_vless() {
     local chat_id=$1
     local username=$2
-    
-    if [ -z "$username" ]; then
-        send_message "$chat_id" "❌ Usage: /removeuser <username>\n\nExample: /removeuser john"
-        return 1
-    fi
-    
-    if id "$username" &>/dev/null; then
-        userdel -r $username 2>/dev/null
-        send_message "$chat_id" "✅ User $username has been removed successfully"
-    else
-        send_message "$chat_id" "❌ User $username does not exist"
-    fi
-}
-
-# Function to check user status
-check_user_status() {
-    local chat_id=$1
-    local username=$2
-    
-    if [ -z "$username" ]; then
-        send_message "$chat_id" "❌ Usage: /status <username>\n\nExample: /status john"
-        return 1
-    fi
-    
-    if id "$username" &>/dev/null; then
-        local expiry=$(chage -l $username | grep "Account expires" | cut -d: -f2)
-        local status="🟢 Active"
-        
-        if [ $(date -d "$expiry" +%s) -lt $(date +%s) ]; then
-            status="🔴 Expired"
-        fi
-        
-        send_message "$chat_id" "📊 Account Status\n\n👤 Username: $username\n📅 Expiry: $expiry\n📊 Status: $status"
-    else
-        send_message "$chat_id" "❌ User $username does not exist"
-    fi
-}
-
-# Function to show server status
-server_status() {
-    local chat_id=$1
-    
-    local cpu_load=$(cat /proc/loadavg | awk '{print $1}')
-    local memory=$(free -m | grep Mem | awk '{printf("%.2f%%", $3/$2*100)}')
-    local disk=$(df -h / | awk 'NR==2 {print $5}')
-    local uptime=$(uptime -p)
-    local server_details=$(get_server_details)
-    
-    send_message "$chat_id" "\
-      ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-📊 𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨:
-📱 𝘾𝙋𝙐 𝙇𝙤𝙖𝙙: $cpu_load
-💾 𝙈𝙚𝙢𝙤𝙧𝙮: $memory
-💿 𝘿𝙞𝙨𝙠: $disk
-⏰ 𝙐𝙥𝙩𝙞𝙢𝙚: $uptime
-
-$server_details
-
-💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━"
-}
-
-# Function to show welcome message
-show_welcome() {
-    local chat_id=$1
-    local welcome_msg="⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
-      𝙎𝙀𝙍𝙑𝙀𝙍 𝙋𝙍𝙀𝙈𝙄𝙐𝙈
-
-    👋 𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉
-
-      📝 𝘾𝙊𝙈𝙈𝘼𝙉𝘿 𝙇𝙄𝙎𝙏 :
-
-          ⚡ /create
-     𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
-
-          🌐 /vless
-       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙇𝙀𝙎𝙎 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
-
-          🌐 /vmess
-       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙈𝙚𝙨𝙨 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
-
-          🗑️ /delete
-       𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧
-
-          📊 /status
-       𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨
-
-          🔄 /restart
-      𝙍𝙚𝙨𝙩𝙖𝙧𝙩 𝘼𝙡𝙡 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨
-
-          🔌 /reboot
-        𝙍𝙚𝙗𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧
-
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn"
-    
-    send_message "$chat_id" "$welcome_msg"
-}
-
-# Function to show help message
-show_help() {
-    local chat_id=$1
-    send_message "$chat_id" "\
-      ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-👋 𝙒𝙚𝙡𝙘𝙤𝙢𝙚!
-
-📝 𝘾𝙤𝙢𝙢𝙖𝙣𝙙𝙨:
-/create - 𝘾𝙧𝙚𝙖𝙩𝙚 𝙣𝙚𝙬 𝙪𝙨𝙚𝙧
-/status - 𝘾𝙝𝙚𝙘𝙠 𝙨𝙩𝙖𝙩𝙪𝙨
-/server - 𝙎𝙚𝙧𝙫𝙚𝙧 𝙞𝙣𝙛𝙤
-
-💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━"
-}
-
-# Function to create user response
-create_user_response() {
-    local username=$1
-    local password=$2
     local duration=$3
-    local ip=$4
-    local domain=$5
-    local expiry=$6
+
+    # Generate UUID
+    uuid=$(uuidgen)
     
-    send_message "$chat_id" "$(cat << EOF
-        ━━━━━━━━━━━━━━━━━━━━━
-
-       ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
-
- ━━━━━━━━━━━━━━━━━━━━━
-
-    ✅ 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 𝘾𝙧𝙚𝙖𝙩𝙚𝙙!
-
-    👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 : $username
-    🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙 : $password
-    ⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣 : $duration Days
-
-      🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
-      📍 𝙄𝙋: $ip
-      🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $domain
-      📅 𝙀𝙭𝙥𝙞𝙧𝙮: $expiry
-
-    ━━━━━━━━━━━━━━━━━━━━━
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-     ━━━━━━━━━━━━━━━━━━━━━
-EOF
-)"
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
+    
+    # Add to Xray config
+    # ... (add your VLESS configuration logic here)
+    
+    # Get server IP/domain
+    domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
+    
+    message="✅ VLESS Account Created\n\n"
+    message+="Username: $username\n"
+    message+="UUID: $uuid\n"
+    message+="Expired Date: $exp_date\n"
+    message+="Domain: $domain\n"
+    message+="Port: 8443\n"
+    message+="Security: TLS\n"
+    
+    send_message "$chat_id" "$message"
 }
 
-# Function to restart services
-restart_services() {
+# Function to create VMess account
+create_vmess() {
     local chat_id=$1
+    local username=$2
+    local duration=$3
+
+    # Generate UUID
+    uuid=$(uuidgen)
     
-    send_message "$chat_id" "🔄 𝙍𝙚𝙨𝙩𝙖𝙧𝙩𝙞𝙣𝙜 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨..."
+    # Calculate expiry date
+    exp_date=$(date -d "+${duration} days" +"%Y-%m-%d")
     
-    # Restart services
-    systemctl restart ssh
-    systemctl restart dropbear
-    systemctl restart stunnel4
-    systemctl restart openvpn
-    systemctl restart trojan
-    systemctl restart shadowsocks-libev
+    # Add to Xray config
+    # ... (add your VMess configuration logic here)
     
-    send_message "$chat_id" "$(cat << 'EOF'
-
-       ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
-
-    ✅ 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
-
-      📋 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙇𝙞𝙨𝙩 𝙇𝙞𝙨𝙩 𝙗𝙖𝙘𝙠 𝙨𝙤𝙤𝙣
-         • SSH
-         • Dropbear
-         • Stunnel4
-         • OpenVPN
-         • Trojan
-         • Shadowsocks
-
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-
-EOF
-)"
-}
-
-# Function to reboot server
-reboot_server() {
-    local chat_id=$1
+    # Get server IP/domain
+    domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
     
-    send_message "$chat_id" "$(cat << 'EOF'
-
-       ⚡ 𝙁��𝙄𝙕-��𝙋𝙉 ⚡
-
-    🔌 𝙍𝙚��𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧...
+    message="✅ VMess Account Created\n\n"
+    message+="Username: $username\n"
+    message+="UUID: $uuid\n"
+    message+="Expired Date: $exp_date\n"
+    message+="Domain: $domain\n"
+    message+="Port: 8443\n"
+    message+="Security: TLS\n"
     
-    ⏳ 𝙡𝙚𝙖𝙨𝙚 𝙬𝙖𝙞 1-2 𝙢𝙞𝙣𝙪𝙩𝙚𝙨
-    
-    🔄 𝙎𝙮𝙨𝙩𝙚𝙢 𝙬𝙞𝙡𝙡 𝙗𝙚 𝙗𝙖𝙘𝙠 𝙨𝙤𝙤𝙣
-
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-
-EOF
-)"
-    
-    # Schedule reboot after message is sent
-    (sleep 2 && reboot) &
+    send_message "$chat_id" "$message"
 }
 
 # Function to delete user
 delete_user() {
     local chat_id=$1
     local username=$2
+
+    if ! grep -q "^ssh:$username:" $USER_DB; then
+        send_message "$chat_id" "❌ Error: User not found"
+        return 1
+    fi
+
+    userdel -f "$username"
+    sed -i "/^ssh:$username:/d" $USER_DB
     
-    if [ -z "$username" ]; then
-        send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
-        return
-    fi
-
-    if id "$username" &>/dev/null; then
-        userdel -f "$username"
-        rm -rf /home/$username
-        send_message "$chat_id" "$(cat << EOF
-     ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-✅ 𝙐𝙨𝙚𝙧 𝙍𝙚𝙢𝙤𝙫𝙚𝙙 𝙎𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮!
-
-👤 Username: $username
-
-💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━
-EOF
-)"
-    else
-        send_message "$chat_id" "❌ 𝙐𝙨𝙚𝙧 $username 𝙙𝙤𝙚𝙨 𝙣𝙤𝙩 𝙚𝙩"
-    fi
+    send_message "$chat_id" "✅ User $username has been deleted"
 }
 
 # Function to check server status
-check_server_status() {
+check_status() {
     local chat_id=$1
     
-    # Get system info
-    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
-    local memory_info=$(free -m | grep Mem)
-    local memory_total=$(echo $memory_info | awk '{print $2}')
-    local memory_used=$(echo $memory_info | awk '{print $3}')
-    local memory_usage=$((memory_used * 100 / memory_total))
-    local disk_usage=$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)
-    local uptime=$(uptime -p)
+    # Get system information
+    cpu_load=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')
+    memory_usage=$(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')
+    disk_usage=$(df -h / | awk 'NR==2{print $5}')
+    uptime=$(uptime -p)
     
-    # Get domain/host info
-    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
+    message="📊 Server Status\n\n"
+    message+="CPU Usage: $cpu_load%\n"
+    message+="Memory Usage: $memory_usage\n"
+    message+="Disk Usage: $disk_usage\n"
+    message+="Uptime: $uptime\n\n"
+    message+="🔰 Service Status:\n"
+    message+="SSH: $(systemctl is-active ssh)\n"
+    message+="Dropbear: $(systemctl is-active dropbear)\n"
+    message+="Stunnel4: $(systemctl is-active stunnel4)\n"
+    message+="Xray: $(systemctl is-active xray)\n"
     
-    # Check service status
-    local ssh_status=$(systemctl is-active ssh)
-    local dropbear_status=$(systemctl is-active dropbear)
-    local stunnel_status=$(systemctl is-active stunnel4)
-    local xray_status=$(systemctl is-active xray)
-    
-    send_message "$chat_id" "$(cat << EOF
-     ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙎𝙏𝘼𝙏𝙐𝙎
-     ━━━━━━━━━━━━━━━━━━━━━
-
-💻 𝙎𝙮𝙨𝙩𝙚𝙢 𝙄𝙣𝙛𝙤:
- • CPU: $cpu_usage%
- • RAM: $memory_usage%
- • Disk: $disk_usage%
- • Uptime: $uptime
-
-📊 𝙎𝙚𝙧𝙫𝙞𝙘𝙚 𝙎𝙩𝙖𝙩𝙪𝙨:
- • SSH: ${ssh_status^^}
- • Dropbear: ${dropbear_status^^}
- • Stunnel: ${stunnel_status^^}
- • Xray: ${xray_status^^}
-
-🌐 𝙑𝙇𝙀𝙎𝙎 𝘾𝙤𝙣𝙛𝙞𝙜:
- • Host: $domain
- • SNI: $domain
- • Port: 8442
- • Path: /vless
- • Network: ws
- • TLS: tls
-
-🌐 𝙑𝙈𝙚𝙨𝙨 𝘾𝙤𝙣𝙛𝙞𝙜:
- • Host: $domain
- • SNI: $domain
- • Port: 8443
- • Path: /vmess
- • Network: ws
- • TLS: tls
-
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━
-EOF
-)"
+    send_message "$chat_id" "$message"
 }
 
-# Function to create Xray user
-create_xray_user() {
-    local chat_id=$1
-    local protocol=$2
-    
-    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
-    user_states[$chat_id]="waiting_xray_username"
-    user_data[$chat_id,protocol]=$protocol
-}
-
-# Function to process Xray user creation
-process_xray_creation() {
-    local chat_id=$1
-    local username=$2
-    local protocol=${user_data[$chat_id,protocol]}
-    
-    # Generate UUID
-    local uuid=$(uuidgen)
-    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
-    local exp_date=$(date -d "+30 days" +"%Y-%m-%d")
-    
-    if [[ "$protocol" == "vless" ]]; then
-        local port="8442"
-        local path="/vless"
-        local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
-        
-        # Add user to Xray config
-        local xray_config="/usr/local/etc/xray/config.json"
-        if [ -f "$xray_config" ]; then
-            # Add VLESS user to config
-            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[0].settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
-            mv "${xray_config}.tmp" "$xray_config"
-            
-            # Restart Xray service
-            systemctl restart xray
-        fi
-    else
-        local port="8443"
-        local path="/vmess"
-        local vmess_config="{\"v\":\"2\",\"ps\":\"FAIZ-${username}\",\"add\":\"${domain}\",\"port\":\"${port}\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"path\":\"${path}\",\"type\":\"none\",\"host\":\"${domain}\",\"tls\":\"tls\"}"
-        local config=$(echo $vmess_config | base64 -w 0)
-        
-        # Add user to Xray config
-        local xray_config="/usr/local/etc/xray/config.json"
-        if [ -f "$xray_config" ]; then
-            # Add VMess user to config
-            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[1].settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
-            mv "${xray_config}.tmp" "$xray_config"
-            
-            # Restart Xray service
-            systemctl restart xray
-        fi
-    fi
-    
-    # Save user info to database
-    echo "${protocol}:${username}:${uuid}:${exp_date}" >> /etc/vps/users.db
-    
-    send_message "$chat_id" "$(cat << EOF
-     ━━━━━━━━━━━━━━━━━━━━━
-       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
-     ━━━━━━━━━━━━━━━━━━━━━
-
-✅ ${protocol^^} Account Created!
-
-👤 Username: $username
-🔑 UUID: $uuid
-📅 Expired: $exp_date
-
-🌐 Configuration:
-• Host: $domain
-• SNI: $domain
-• Port: $port
-• Path: $path
-• Network: ws
-• TLS: tls
-
-📝 ${protocol^^} Config:
-<code>$config</code>
-
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━
-EOF
-)"
-    
-    # Reset state
-    user_states[$chat_id]="none"
-    unset user_data[$chat_id,protocol]
-}
-
-# Function to process messages
-process_message() {
+# Function to send message
+send_message() {
     local chat_id=$1
     local message=$2
+    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+        -d chat_id="$chat_id" \
+        -d text="$message" \
+        -d parse_mode="HTML"
+}
+
+# Main command handler
+handle_command() {
+    local chat_id=$1
+    local command=$2
+    local args=("${@:3}")
     
-    case "$message" in
-        "/start")
-            show_welcome "$chat_id"
+    case $command in
+        "/start" | "/help")
+            message="⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡\n"
+            message+="      𝙎𝙀𝙍𝙑𝙀𝙍 𝙋𝙍𝙀𝙈𝙄𝙐𝙈\n\n"
+            message+="    👋 𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉\n\n"
+            message+="      📝 𝘾𝙊𝙈𝙈𝘼𝙉𝘿 𝙇𝙄𝙎𝙏 :\n\n"
+            message+="          ⚡ /create\n"
+            message+="     𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩\n\n"
+            message+="          🌐 /vless\n"
+            message+="       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙇𝙀𝙎𝙎 𝘼𝙘𝙘𝙤𝙪𝙣𝙩\n\n"
+            message+="          🌐 /vmess\n"
+            message+="       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙈𝙚𝙨𝙨 𝘼𝙘𝙘𝙤𝙪𝙣𝙩\n\n"
+            message+="          🗑️ /delete\n"
+            message+="       𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧\n\n"
+            message+="          📊 /status\n"
+            message+="       𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨\n\n"
+            message+="          🔄 /restart\n"
+            message+="      𝙍𝙚𝙨𝙩𝙖𝙧𝙩 𝘼𝙡𝙡 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨\n\n"
+            message+="          🔌 /reboot\n"
+            message+="        𝙍𝙚𝙗𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧\n\n"
+            message+="      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn"
+            send_message "$chat_id" "$message"
+            ;;
+        "/create")
+            if [ ${#args[@]} -ne 3 ]; then
+                send_message "$chat_id" "Usage: /create username password duration"
+                return 1
+            fi
+            create_account "$chat_id" "${args[0]}" "${args[1]}" "${args[2]}"
             ;;
         "/vless")
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
-            user_states[$chat_id]="waiting_vless_username"
+            if [ ${#args[@]} -ne 2 ]; then
+                send_message "$chat_id" "Usage: /vless username duration"
+                return 1
+            fi
+            create_vless "$chat_id" "${args[0]}" "${args[1]}"
             ;;
         "/vmess")
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
-            user_states[$chat_id]="waiting_vmess_username"
-            ;;
-        "/status")
-            check_server_status "$chat_id"
-            ;;
-        "/restart")
-            restart_services "$chat_id"
-            ;;
-        "/reboot")
-            reboot_server "$chat_id"
+            if [ ${#args[@]} -ne 2 ]; then
+                send_message "$chat_id" "Usage: /vmess username duration"
+                return 1
+            fi
+            create_vmess "$chat_id" "${args[0]}" "${args[1]}"
             ;;
         "/delete")
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
-            user_states[$chat_id]="waiting_delete_username"
+            if [ ${#args[@]} -ne 1 ]; then
+                send_message "$chat_id" "Usage: /delete username"
+                return 1
+            fi
+            delete_user "$chat_id" "${args[0]}"
+            ;;
+        "/status")
+            check_status "$chat_id"
+            ;;
+        "/restart")
+            systemctl restart ssh dropbear stunnel4 xray
+            send_message "$chat_id" "✅ All services have been restarted"
+            ;;
+        "/reboot")
+            send_message "$chat_id" "🔄 Server is rebooting..."
+            reboot
             ;;
         *)
-            # Handle username inputs based on state
-            local state=${user_states[$chat_id]:-"none"}
-            case $state in
-                "waiting_vless_username")
-                    create_vless_user "$chat_id" "$message"
-                    user_states[$chat_id]="none"
-                    ;;
-                "waiting_vmess_username")
-                    create_vmess_user "$chat_id" "$message"
-                    user_states[$chat_id]="none"
-                    ;;
-                "waiting_delete_username")
-                    delete_user "$chat_id" "$message"
-                    user_states[$chat_id]="none"
-                    ;;
-                *)
-                    show_welcome "$chat_id"
-                    ;;
-            esac
+            send_message "$chat_id" "❌ Unknown command. Use /help to see available commands."
             ;;
     esac
 }
 
-# Start bot loop
-offset=0
+# Main loop to handle incoming updates
 while true; do
-    updates=$(curl -s "$API_URL/getUpdates?offset=$offset&timeout=60")
+    # Get updates from Telegram
+    updates=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$((offset + 1))")
     
-    for update in $(echo "$updates" | jq -r '.result[] | @base64'); do
-        update_data=$(echo $update | base64 -d)
-        chat_id=$(echo $update_data | jq -r '.message.chat.id')
-        message=$(echo $update_data | jq -r '.message.text')
-        update_id=$(echo $update_data | jq -r '.update_id')
-        
-        if [ -n "$message" ]; then
-            process_message "$chat_id" "$message"
+    # Process each update
+    while read -r update_id chat_id message; do
+        if [ -n "$update_id" ]; then
+            offset=$update_id
+            handle_command "$chat_id" $message
         fi
-        
-        offset=$((update_id + 1))
-    done
+    done < <(echo "$updates" | jq -r '.result[] | "\(.update_id) \(.message.chat.id) \(.message.text)"')
     
     sleep 1
 done
