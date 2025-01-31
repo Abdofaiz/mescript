@@ -932,10 +932,66 @@ check_service_status() {
 install_badvpn() {
     if [ ! -f "/usr/bin/badvpn-udpgw" ]; then
         echo -e "${YELLOW}Installing BadVPN...${NC}"
+        
+        # Install dependencies
+        apt-get update
+        apt-get install -y cmake make gcc build-essential
+        
+        # Create directory and download source
+        mkdir -p /tmp/badvpn
+        cd /tmp/badvpn
+        
+        # Download and extract BadVPN source
+        wget -O badvpn.zip "https://github.com/ambrop72/badvpn/archive/refs/heads/master.zip"
+        unzip badvpn.zip
+        cd badvpn-master
+        
+        # Compile and install
+        cmake . -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
+        make install
+        
+        # Create systemd service
+        cat > /etc/systemd/system/badvpn.service << EOF
+[Unit]
+Description=BadVPN UDPGW Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 1000 --max-connections-for-client 100
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+        # Reload systemd and enable service
+        systemctl daemon-reload
+        systemctl enable badvpn
+        systemctl start badvpn
+        
+        # Cleanup
+        cd ~
+        rm -rf /tmp/badvpn
+        
+        echo -e "${GREEN}BadVPN installed successfully${NC}"
+    else
+        echo -e "${YELLOW}BadVPN is already installed${NC}"
+    fi
+}
+
+# Function to install BadVPN (Alternative Method)
+install_badvpn_alt() {
+    if [ ! -f "/usr/bin/badvpn-udpgw" ]; then
+        echo -e "${YELLOW}Installing BadVPN (Alternative Method)...${NC}"
+        
+        # Download pre-compiled binary
         wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/Abdofaiz/mescript/main/badvpn-udpgw64"
         chmod +x /usr/bin/badvpn-udpgw
         
-        # Create systemd service file
+        # Create systemd service
         cat > /etc/systemd/system/badvpn.service << EOF
 [Unit]
 Description=BadVPN UDPGW Service
@@ -951,10 +1007,12 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-        
+
+        # Reload systemd and enable service
         systemctl daemon-reload
         systemctl enable badvpn
         systemctl start badvpn
+        
         echo -e "${GREEN}BadVPN installed successfully${NC}"
     else
         echo -e "${YELLOW}BadVPN is already installed${NC}"
@@ -967,11 +1025,12 @@ manage_badvpn() {
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}              BadVPN Management                  ${NC}"
     echo -e "${GREEN}=================================================${NC}"
-    echo -e "${GREEN}1.${NC} Install BadVPN"
-    echo -e "${GREEN}2.${NC} Start BadVPN"
-    echo -e "${GREEN}3.${NC} Stop BadVPN"
-    echo -e "${GREEN}4.${NC} Restart BadVPN"
-    echo -e "${GREEN}5.${NC} Check BadVPN Status"
+    echo -e "${GREEN}1.${NC} Install BadVPN (Compile from source)"
+    echo -e "${GREEN}2.${NC} Install BadVPN (Pre-compiled binary)"
+    echo -e "${GREEN}3.${NC} Start BadVPN"
+    echo -e "${GREEN}4.${NC} Stop BadVPN"
+    echo -e "${GREEN}5.${NC} Restart BadVPN"
+    echo -e "${GREEN}6.${NC} Check BadVPN Status"
     echo -e "${GREEN}0.${NC} Back to Main Menu"
     echo -e "${GREEN}=================================================${NC}"
     read -p "Select option: " badvpn_option
@@ -981,21 +1040,26 @@ manage_badvpn() {
             install_badvpn
             ;;
         2)
+            install_badvpn_alt
+            ;;
+        3)
             systemctl start badvpn
             echo -e "${GREEN}BadVPN started${NC}"
             ;;
-        3)
+        4)
             systemctl stop badvpn
             echo -e "${YELLOW}BadVPN stopped${NC}"
             ;;
-        4)
+        5)
             systemctl restart badvpn
             echo -e "${GREEN}BadVPN restarted${NC}"
             ;;
-        5)
+        6)
             if systemctl is-active --quiet badvpn; then
                 echo -e "${GREEN}BadVPN is running${NC}"
                 echo -e "Port: 7300"
+                echo -e "Status: $(systemctl status badvpn | grep Active)"
+                echo -e "Memory usage: $(ps aux | grep badvpn | grep -v grep | awk '{print $6/1024 "MB"}')"
             else
                 echo -e "${RED}BadVPN is not running${NC}"
             fi
