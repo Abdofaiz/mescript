@@ -10,6 +10,10 @@ fi
 
 API_URL="https://api.telegram.org/bot$BOT_TOKEN"
 
+# Store user creation state
+declare -A user_states
+declare -A user_data
+
 # Function to send message
 send_message() {
     local chat_id=$1
@@ -17,54 +21,33 @@ send_message() {
     curl -s -X POST "$API_URL/sendMessage" -d "chat_id=$chat_id" -d "text=$text" -d "parse_mode=HTML"
 }
 
-# Function to add new user
-add_user() {
+# Function to create user
+create_user() {
     local chat_id=$1
     local username=$2
     local password=$3
-    local duration=$4
     
-    if [ -z "$username" ] || [ -z "$password" ] || [ -z "$duration" ]; then
-        send_message "$chat_id" "\
-━━━━━━━━━━━━━━━━━━━━━
-       🚀 FAIZ-VPN MANAGER BOT
-━━━━━━━━━━━━━━━━━━━━━
-
-1️⃣ Enter Username:
-Format: /adduser username
-
-2️⃣ Enter Password:
-Format: /adduser username password
-
-3️⃣ Enter Duration (days):
-Format: /adduser username password days
-
-Example: /adduser john pass123 30
-━━━━━━━━━━━━━━━━━━━━━"
-        return 1
-    fi
-    
-    # Add user using your existing script
-    useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
+    # Add user
+    useradd -e $(date -d "+30 days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
     
     send_message "$chat_id" "\
 ━━━━━━━━━━━━━━━━━━━━━
-       🚀 FAIZ-VPN MANAGER BOT
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
 ━━━━━━━━━━━━━━━━━━━━━
 
-✅ Account Created Successfully!
+✅ 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 𝘾𝙧𝙚𝙖𝙩𝙚𝙙 𝙎𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮!
 
-👤 Username: $username
-🔑 Password: $password
-⏱ Duration: $duration days
+👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username
+🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password
+⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: 30 days
 
-🌐 Server Details:
-📍 IP: $(curl -s ipv4.icanhazip.com)
-🔗 Domain: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
-📅 Expiry: $(date -d "+$duration days" +"%Y-%m-%d")
+🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
+📍 𝙄𝙋: $(curl -s ipv4.icanhazip.com)
+🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
+📅 𝙀𝙭𝙥𝙞𝙧𝙮: $(date -d "+30 days" +"%Y-%m-%d")
 
-💡 Support: @faizvpn
+💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
 }
 
@@ -127,125 +110,84 @@ show_help() {
     local chat_id=$1
     send_message "$chat_id" "\
 ━━━━━━━━━━━━━━━━━━━━━
-       🚀 FAIZ-VPN MANAGER BOT
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
 ━━━━━━━━━━━━━━━━━━━━━
 
-👋 Welcome to FAIZ-VPN Manager!
+👋 𝙒𝙚𝙡𝙘𝙤𝙢𝙚!
 
-📝 Available Commands:
+📝 𝘾𝙤𝙢𝙢𝙖𝙣𝙙𝙨:
+/create - 𝘾𝙧𝙚𝙖𝙩𝙚 𝙣𝙚𝙬 𝙪𝙨𝙚𝙧
+/status - 𝘾𝙝𝙚𝙘𝙠 𝙨𝙩𝙖𝙩𝙪𝙨
+/server - 𝙎𝙚𝙧𝙫𝙚𝙧 𝙞𝙣𝙛𝙤
 
-1️⃣ /adduser - Create new account
-Format: /adduser username password days
-
-2️⃣ /removeuser - Delete account
-Format: /removeuser username
-
-3️⃣ /status - Check account status
-Format: /status username
-
-4️⃣ /server - View server status
-
-💡 Support: @faizvpn
+💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
 }
 
-# Main bot loop
+# Process messages
 process_message() {
     local chat_id=$1
     local message=$2
     
-    case $message in
-        "/start"|"/help")
-            show_help "$chat_id"
-            ;;
-        "/adduser")
-            send_message "$chat_id" "\
+    # Get current state
+    local state=${user_states[$chat_id]:-"none"}
+    
+    case $state in
+        "none")
+            case $message in
+                "/create")
+                    user_states[$chat_id]="waiting_username"
+                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
+                    ;;
+                "/start")
+                    send_message "$chat_id" "\
 ━━━━━━━━━━━━━━━━━━━━━
-       🚀 FAIZ-VPN MANAGER BOT
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
 ━━━━━━━━━━━━━━━━━━━━━
 
-1️⃣ Enter Username:
-Format: /adduser username
+👋 𝙒𝙚𝙡𝙘𝙤𝙢𝙚!
 
-2️⃣ Enter Password:
-Format: /adduser username password
+📝 𝘾𝙤𝙢𝙢𝙖𝙣𝙙𝙨:
+/create - 𝘾𝙧𝙚𝙖𝙩𝙚 𝙣𝙚𝙬 𝙪𝙨𝙚𝙧
+/status - 𝘾𝙝𝙚𝙘𝙠 𝙨𝙩𝙖𝙩𝙪𝙨
+/server - 𝙎𝙚𝙧𝙫𝙚𝙧 𝙞𝙣𝙛𝙤
 
-3️⃣ Enter Duration (days):
-Format: /adduser username password days
-
-Example: /adduser john pass123 30
+💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
+                    ;;
+                *)
+                    send_message "$chat_id" "𝙐𝙨𝙚 /create 𝙩𝙤 𝙘𝙧𝙚𝙖𝙩𝙚 𝙣𝙚𝙬 𝙪𝙨𝙚𝙧"
+                    ;;
+            esac
             ;;
-        "/adduser "*)
-            local params=(${message#"/adduser "})
-            if [ ${#params[@]} -eq 3 ]; then
-                add_user "$chat_id" "${params[0]}" "${params[1]}" "${params[2]}"
-            else
-                send_message "$chat_id" "\
-━━━━━━━━━━━━━━━━━━━━━
-       🚀 FAIZ-VPN MANAGER BOT
-━━━━━━━━━━━━━━━━━━━━━
-
-❌ Incomplete Command
-
-1️⃣ Enter Username
-2️⃣ Enter Password
-3️⃣ Enter Duration (days)
-
-Example: /adduser john pass123 30
-━━━━━━━━━━━━━━━━━━━━━"
-            fi
+        "waiting_username")
+            user_data[$chat_id,username]=$message
+            user_states[$chat_id]="waiting_password"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙋𝙖𝙨𝙨 :"
             ;;
-        "/removeuser "*)
-            local username=${message#"/removeuser "}
-            remove_user "$chat_id" "$username"
-            ;;
-        "/status "*)
-            local username=${message#"/status "}
-            check_user_status "$chat_id" "$username"
-            ;;
-        "/server")
-            server_status "$chat_id"
-            ;;
-        *)
-            send_message "$chat_id" "\
-━━━━━━━━━━━━━━━━━━━━━
-       🚀 FAIZ-VPN MANAGER BOT
-━━━━━━━━━━━━━━━━━━━━━
-
-❌ Unknown command
-
-📝 Available Commands:
-/start - Show menu
-/adduser - Create account
-/removeuser - Delete account
-/status - Check account
-/server - Server status
-
-💡 Support: @faizvpn
-━━━━━━━━━━━━━━━━━━━━━"
+        "waiting_password")
+            local username=${user_data[$chat_id,username]}
+            create_user "$chat_id" "$username" "$message"
+            user_states[$chat_id]="none"
+            unset user_data[$chat_id,username]
             ;;
     esac
 }
 
-# Start webhook or polling
-if [ "$1" = "webhook" ]; then
-    curl -F "url=https://your-domain.com/webhook" "$API_URL/setWebhook"
-else
-    offset=0
-    while true; do
-        updates=$(curl -s "$API_URL/getUpdates?offset=$offset&timeout=60")
+# Start bot loop
+offset=0
+while true; do
+    updates=$(curl -s "$API_URL/getUpdates?offset=$offset&timeout=60")
+    
+    for update in $(echo "$updates" | jq -r '.result[] | @base64'); do
+        update_data=$(echo $update | base64 -d)
+        chat_id=$(echo $update_data | jq -r '.message.chat.id')
+        message=$(echo $update_data | jq -r '.message.text')
+        update_id=$(echo $update_data | jq -r '.update_id')
         
-        for update in $(echo "$updates" | jq -r '.result[] | @base64'); do
-            update_data=$(echo $update | base64 -d)
-            chat_id=$(echo $update_data | jq -r '.message.chat.id')
-            message=$(echo $update_data | jq -r '.message.text')
-            update_id=$(echo $update_data | jq -r '.update_id')
-            
-            process_message "$chat_id" "$message"
-            offset=$((update_id + 1))
-        done
-        
-        sleep 1
+        process_message "$chat_id" "$message"
+        offset=$((update_id + 1))
     done
-fi
+    
+    sleep 1
+done
