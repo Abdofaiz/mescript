@@ -311,6 +311,9 @@ main_install() {
     systemctl restart squid
     systemctl restart xray
     
+    # Save installation date
+    date "+%Y-%m-%d" > /etc/vps/install-date
+    
     # Final setup
     echo -e "${GREEN}Installation completed!${NC}"
     echo -e "${YELLOW}Type 'menu' to access the control panel${NC}"

@@ -1048,6 +1048,9 @@ get_system_info() {
     
     # Get system uptime
     UPTIME=$(uptime -p | cut -d " " -f 2-)
+
+    # Get install date
+    INSTALL_DATE=$(cat /etc/vps/install-date 2>/dev/null || echo "Not Available")
 }
 
 # Main menu display
@@ -1065,6 +1068,7 @@ show_main_menu() {
     echo -e "${GREEN}- CPU Load      :${NC} $CPU_LOAD"
     echo -e "${GREEN}- RAM Usage     :${NC} $USED_RAM MB / $TOTAL_RAM MB ($RAM_PERCENT%)"
     echo -e "${GREEN}- Uptime        :${NC} $UPTIME"
+    echo -e "${GREEN}- Install Date  :${NC} $INSTALL_DATE"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${GREEN}1.${NC} SSH & OpenVPN Menu"
     echo -e "${GREEN}2.${NC} Xray Menu"
