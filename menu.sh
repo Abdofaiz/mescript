@@ -1624,10 +1624,14 @@ while true; do
             ;;
         5)
             clear
-            echo -e "${GREEN}=== System Settings ===${NC}"
+            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "              🛠️ 𝙎𝙮𝙨𝙩𝙚�� 𝙎𝙚𝙩𝙩𝙞𝙣𝙜𝙨"
+            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             echo -e "${GREEN}1.${NC} Add/Change Domain"
             echo -e "${GREEN}2.${NC} Change Port Services"
+            echo -e "${GREEN}3.${NC} Fix Stunnel4 Service"
             echo -e "${GREEN}0.${NC} Back to main menu"
+            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             read -p "Select option: " settings_option
 
             case $settings_option in
@@ -1637,6 +1641,10 @@ while true; do
                     ;;
                 2)
                     change_ports
+                    press_enter
+                    ;;
+                3)
+                    fix_stunnel
                     press_enter
                     ;;
                 0)
