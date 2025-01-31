@@ -42,6 +42,40 @@ get_server_details() {
 • UDP Custom : 1-65535"
 }
 
+# Function to generate fancy text and icons
+get_fancy_text() {
+    local text=$1
+    echo "𝙁𝘼𝙄𝙕-𝙑𝙋𝙉"
+}
+
+get_fancy_icon() {
+    local type=$1
+    case $type in
+        "welcome") echo "👋" ;;
+        "create") echo "⚡" ;;
+        "status") echo "🔍" ;;
+        "server") echo "📊" ;;
+        "support") echo "💡" ;;
+        "success") echo "✅" ;;
+        "user") echo "👤" ;;
+        "pass") echo "🔑" ;;
+        "duration") echo "⏱" ;;
+        "expiry") echo "📅" ;;
+        "ip") echo "📍" ;;
+        "domain") echo "🔗" ;;
+        "port") echo "📡" ;;
+        "ssl") echo "🔒" ;;
+        "websocket") echo "🌐" ;;
+        "udp") echo "🔰" ;;
+        "services") echo "💎" ;;
+        *) echo "•" ;;
+    esac
+}
+
+get_border() {
+    echo "━━━━━━━━━━━━━━━━━━━━━"
+}
+
 # Function to create user
 create_user() {
     local chat_id=$1
@@ -146,34 +180,28 @@ $server_details
 # Function to show welcome message
 show_welcome() {
     local chat_id=$1
-    send_message "$chat_id" "$(cat << 'EOF'
-╔═══════════════════════╗
-║    ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡     ║
-║      𝙋𝙍𝙀𝙈𝙄𝙐𝙈        ║
-╚═══════════════════════╝
+    local border=$(get_border)
+    local bot_name=$(get_fancy_text "FAIZ-VPN")
+    local welcome_icon=$(get_fancy_icon "welcome")
+    local create_icon=$(get_fancy_icon "create")
+    local status_icon=$(get_fancy_icon "status")
+    local server_icon=$(get_fancy_icon "server")
+    local support_icon=$(get_fancy_icon "support")
+    
+    send_message "$chat_id" "\
+$border
+       🚀 $bot_name 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
+$border
 
-     🎭 𝙒𝙀𝙇𝘾𝙊𝙈𝙀 🎭
+$welcome_icon 𝙒𝙚𝙡𝙘𝙤𝙢𝙚!
 
-╔═══════════════════════╗
-║    🔥 𝘾𝙊𝙈𝙈𝘼𝙉𝘿𝙎 🔥    ║
-╠═══════════════════════╣
-║ ⚡ /create            ║
-║   𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩  ║
-║                       ║
-║ 🔍 /status            ║
-║   𝘾𝙝𝙚𝙘𝙠 𝙐𝙨𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨   ║
-║                       ║
-║ 📊 /server            ║
-║   𝙎𝙚𝙧𝙫𝙚𝙧 𝙄𝙣𝙛𝙤𝙧𝙢𝙖𝙩𝙞𝙤𝙣 ║
-╠═══════════════════════╣
-║    💫 𝙎𝙐𝙋𝙋𝙊𝙍𝙏 💫     ║
-║      @faizvpn         ║
-╚═══════════════════════╝
+📝 𝘾𝙤𝙢𝙢𝙖𝙣𝙙𝙨:
+$create_icon /create - 𝘾𝙧𝙚𝙖𝙩𝙚 𝙣𝙚𝙬 𝙪𝙨𝙚𝙧
+$status_icon /status - 𝘾𝙝𝙚𝙘𝙠 𝙨𝙩𝙖𝙩𝙪𝙨
+$server_icon /server - 𝙎𝙚𝙧𝙫𝙚𝙧 𝙞𝙣𝙛𝙤
 
-     ⭐️ 𝙋𝙍𝙀𝙈𝙄𝙐𝙈 ⭐️
-   𝙑𝙋𝙉 𝙎𝙀𝙍𝙑𝙄𝘾𝙀 𝙋𝙍𝙊𝙑𝙄𝘿𝙀𝙍
-EOF
-)"
+$support_icon 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
+$border"
 }
 
 # Function to show help message
@@ -193,6 +221,45 @@ show_help() {
 
 💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# Function to create user response
+create_user_response() {
+    local username=$1
+    local password=$2
+    local duration=$3
+    local ip=$4
+    local domain=$5
+    local expiry=$6
+    
+    local border=$(get_border)
+    local bot_name=$(get_fancy_text "FAIZ-VPN")
+    local success_icon=$(get_fancy_icon "success")
+    local user_icon=$(get_fancy_icon "user")
+    local pass_icon=$(get_fancy_icon "pass")
+    local duration_icon=$(get_fancy_icon "duration")
+    local ip_icon=$(get_fancy_icon "ip")
+    local domain_icon=$(get_fancy_icon "domain")
+    local expiry_icon=$(get_fancy_icon "expiry")
+    
+    echo "\
+$border
+       🚀 $bot_name 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
+$border
+
+$success_icon 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 𝘾𝙧𝙚𝙖𝙩𝙚𝙙 𝙎𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮!
+
+$user_icon 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username
+$pass_icon 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password
+$duration_icon 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: $duration days
+
+🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
+$ip_icon 𝙄𝙋: $ip
+$domain_icon 𝘿𝙤𝙢𝙖𝙞𝙣: $domain
+$expiry_icon 𝙀𝙭𝙥𝙞𝙧𝙮: $expiry
+
+💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
+$border"
 }
 
 # Process messages
