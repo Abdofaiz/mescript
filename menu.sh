@@ -1063,35 +1063,34 @@ manage_telegram_bot() {
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}            Telegram Bot Management              ${NC}"
     echo -e "${GREEN}=================================================${NC}"
-    echo -e "${GREEN}1.${NC} Add New User"
-    echo -e "${GREEN}2.${NC} Remove User"
-    echo -e "${GREEN}3.${NC} Check User Status"
-    echo -e "${GREEN}4.${NC} Server Status"
-    echo -e "${GREEN}5.${NC} Bot Settings"
+    echo -e "${GREEN}1.${NC} Configure Bot Settings"
+    echo -e "${GREEN}2.${NC} Add New User"
+    echo -e "${GREEN}3.${NC} Remove User"
+    echo -e "${GREEN}4.${NC} Check User Status"
+    echo -e "${GREEN}5.${NC} Server Status"
     echo -e "${GREEN}0.${NC} Back to Main Menu"
     echo -e "${GREEN}=================================================${NC}"
     read -p "Select option: " bot_option
 
     case $bot_option in
         1)
-            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
-            echo -e "Use command: /adduser username password duration"
+            configure_telegram_bot
             ;;
         2)
-            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
-            echo -e "Use command: /removeuser username"
+            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+            echo -e "Use command: /adduser username password duration"
             ;;
         3)
-            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
-            echo -e "Use command: /status username"
+            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+            echo -e "Use command: /removeuser username"
             ;;
         4)
-            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
-            echo -e "Use command: /serverstatus"
+            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+            echo -e "Use command: /status username"
             ;;
         5)
-            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
-            echo -e "Use command: /settings"
+            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+            echo -e "Use command: /server"
             ;;
         0)
             return

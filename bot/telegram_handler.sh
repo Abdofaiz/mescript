@@ -1,6 +1,13 @@
 #!/bin/bash
 
-BOT_TOKEN="7536534477:AAEVbj_rJwGjYhpGUCHCDZjUnZXfbn2fL9o"
+# Load configuration
+if [ -f "/etc/vps/telegram.conf" ]; then
+    source /etc/vps/telegram.conf
+else
+    echo "Error: Telegram configuration not found"
+    exit 1
+fi
+
 API_URL="https://api.telegram.org/bot$BOT_TOKEN"
 
 # Function to send message
