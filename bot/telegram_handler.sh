@@ -282,7 +282,7 @@ restart_services() {
     
     send_message "$chat_id" "$(cat << 'EOF'
 
-       ⚡ 𝙁𝘼𝙄��-𝙑𝙋𝙉 ⚡
+       ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
 
     ✅ 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
 
@@ -306,7 +306,7 @@ reboot_server() {
     
     send_message "$chat_id" "$(cat << 'EOF'
 
-       ⚡ 𝙁𝘼𝙄𝙕-��𝙋𝙉 ⚡
+       ⚡ 𝙁��𝙄𝙕-��𝙋�� ⚡
 
     🔌 𝙍𝙚��𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧...
     
@@ -321,6 +321,37 @@ EOF
     
     # Schedule reboot after message is sent
     (sleep 2 && reboot) &
+}
+
+# Function to delete user
+delete_user() {
+    local chat_id=$1
+    local username=$2
+    
+    if [ -z "$username" ]; then
+        send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+        return
+    fi
+
+    if id "$username" &>/dev/null; then
+        userdel -f "$username"
+        rm -rf /home/$username
+        send_message "$chat_id" "$(cat << EOF
+     ━━━━━━━━━━━━━━━━━━━━━
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
+     ━━━━━━━━━━━━━━━━━━━━━
+
+✅ 𝙐𝙨𝙚𝙧 𝙍𝙚𝙢𝙤𝙫𝙚𝙙 𝙎𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮!
+
+👤 Username: $username
+
+💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
+━━━━━━━━━━━━━━━━━━━━━
+EOF
+)"
+    else
+        send_message "$chat_id" "❌ 𝙐𝙨𝙚𝙧 $username 𝙙𝙤𝙚𝙨 𝙣𝙤𝙩 𝙚��𝙞𝙨𝙩"
+    fi
 }
 
 # Process messages
@@ -360,6 +391,10 @@ process_message() {
                     send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝘾𝙝𝙚𝙘𝙠:"
                     user_states[$chat_id]="waiting_info_username"
                     ;;
+                "/delete")
+                    user_states[$chat_id]="waiting_delete_username"
+                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+                    ;;
                 *)
                     send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
                     ;;
@@ -382,6 +417,10 @@ process_message() {
             user_states[$chat_id]="none"
             unset user_data[$chat_id,username]
             unset user_data[$chat_id,password]
+            ;;
+        "waiting_delete_username")
+            delete_user "$chat_id" "$message"
+            user_states[$chat_id]="none"
             ;;
     esac
 }
