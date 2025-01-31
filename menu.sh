@@ -137,11 +137,11 @@ extend_ssh_ovpn() {
 check_ssh_ovpn() {
     clear
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "               🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙐𝙎𝙀𝙍 𝙎𝙏𝘼𝙏𝙐𝙎"
+    echo -e "                 FAIZ-VPN USER STATUS"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     # First show active connections summary
-    echo -e "\n${YELLOW}🌟 𝘼𝙘𝙩𝙞𝙫𝙚 𝙐𝙨𝙚𝙧𝙨 𝙎𝙪𝙢𝙢𝙖𝙧𝙮:${NC}"
+    echo -e "\n${YELLOW}Active Users Summary:${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     printf "%-15s %-15s %-15s %-15s\n" "Username" "SSH/SSL" "Dropbear" "Total"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -159,7 +159,7 @@ check_ssh_ovpn() {
     done < $USER_DB
     
     # Then show detailed connection information for users with active connections
-    echo -e "\n${YELLOW}📊 𝘿𝙚𝙩𝙖𝙞𝙡𝙚𝙙 𝘾𝙤𝙣𝙣𝙚𝙘𝙩𝙞𝙤𝙣 𝙄𝙣𝙛𝙤:${NC}"
+    echo -e "\n${YELLOW}Detailed Connection Info:${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     while IFS=: read -r type username _ expiry; do
@@ -169,24 +169,24 @@ check_ssh_ovpn() {
             total=$((ssh_count + db_count))
             
             if [ $total -gt 0 ]; then
-                echo -e "\n${GREEN}👤 User: $username${NC}"
-                echo -e "📅 Expiry: $expiry"
+                echo -e "\n${GREEN}User: $username${NC}"
+                echo -e "Expiry: $expiry"
                 if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
-                    echo -e "📊 Status: ${GREEN}Active${NC}"
+                    echo -e "Status: ${GREEN}Active${NC}"
                 else
-                    echo -e "📊 Status: ${RED}Expired${NC}"
+                    echo -e "Status: ${RED}Expired${NC}"
                 fi
                 
                 # Show SSH/SSL connections
                 if [ $ssh_count -gt 0 ]; then
-                    echo -e "\n${YELLOW}🔒 SSH/SSL Connections:${NC}"
+                    echo -e "\n${YELLOW}SSH/SSL Connections:${NC}"
                     netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | \
                     while read line; do
                         ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
                         port=$(echo $line | awk '{print $5}' | cut -d: -f2)
                         pid=$(echo $line | awk '{print $7}' | cut -d/ -f1)
                         duration=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
-                        echo -e "   ⚡ IP: $ip"
+                        echo -e "   > IP: $ip"
                         echo -e "      Port: $port"
                         echo -e "      Duration: $duration"
                     done
@@ -194,20 +194,20 @@ check_ssh_ovpn() {
                 
                 # Show Dropbear connections
                 if [ $db_count -gt 0 ]; then
-                    echo -e "\n${YELLOW}🔑 Dropbear Connections:${NC}"
+                    echo -e "\n${YELLOW}Dropbear Connections:${NC}"
                     netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | \
                     while read line; do
                         ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
                         port=$(echo $line | awk '{print $5}' | cut -d: -f2)
                         pid=$(echo $line | awk '{print $7}' | cut -d/ -f1)
                         duration=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
-                        echo -e "   ⚡ IP: $ip"
+                        echo -e "   > IP: $ip"
                         echo -e "      Port: $port"
                         echo -e "      Duration: $duration"
                     done
                 fi
                 
-                echo -e "\n${YELLOW}📈 Connection Summary:${NC}"
+                echo -e "\n${YELLOW}Connection Summary:${NC}"
                 echo -e "   • SSH/SSL: $ssh_count"
                 echo -e "   • Dropbear: $db_count"
                 echo -e "   • Total: $total"
@@ -216,7 +216,7 @@ check_ssh_ovpn() {
         fi
     done < $USER_DB
 
-    echo -e "\n${YELLOW}💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩 𝙂𝙧𝙤𝙪𝙥: @faizvpn${NC}"
+    echo -e "\n${YELLOW}Support: @faizvpn${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     read -n 1 -s -r -p "Press any key to continue"
 }
@@ -1625,7 +1625,7 @@ while true; do
         5)
             clear
             echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            echo -e "              🛠️ 𝙎𝙮𝙨𝙩𝙚�� 𝙎𝙚𝙩𝙩𝙞𝙣𝙜𝙨"
+            echo -e "              🛠️ 𝙎𝙮𝙨𝙩𝙚𝙢 𝙎𝙚𝙩𝙩𝙞𝙣𝙜𝙨"
             echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             echo -e "${GREEN}1.${NC} Add/Change Domain"
             echo -e "${GREEN}2.${NC} Change Port Services"
