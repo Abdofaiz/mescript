@@ -353,11 +353,11 @@ delete_user() {
 EOF
 )"
     else
-        send_message "$chat_id" "❌ 𝙐𝙨𝙚𝙧 $username 𝙙𝙤𝙚𝙨 𝙣𝙤𝙩 𝙚��𝙩"
+        send_message "$chat_id" "❌ 𝙐𝙨𝙚𝙧 $username 𝙙𝙤𝙚𝙨 𝙣𝙤𝙩 𝙚𝙩"
     fi
 }
 
-# Add new function to check server status
+# Function to check server status
 check_server_status() {
     local chat_id=$1
     
@@ -370,13 +370,14 @@ check_server_status() {
     local disk_usage=$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)
     local uptime=$(uptime -p)
     
+    # Get domain/host info
+    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
+    
     # Check service status
     local ssh_status=$(systemctl is-active ssh)
     local dropbear_status=$(systemctl is-active dropbear)
     local stunnel_status=$(systemctl is-active stunnel4)
-    local openvpn_status=$(systemctl is-active openvpn)
-    local trojan_status=$(systemctl is-active trojan)
-    local shadowsocks_status=$(systemctl is-active shadowsocks-libev)
+    local xray_status=$(systemctl is-active xray)
     
     send_message "$chat_id" "$(cat << EOF
      ━━━━━━━━━━━━━━━━━━━━━
@@ -393,9 +394,23 @@ check_server_status() {
  • SSH: ${ssh_status^^}
  • Dropbear: ${dropbear_status^^}
  • Stunnel: ${stunnel_status^^}
- • OpenVPN: ${openvpn_status^^}
- • Trojan: ${trojan_status^^}
- • Shadowsocks: ${shadowsocks_status^^}
+ • Xray: ${xray_status^^}
+
+🌐 𝙑𝙇𝙀𝙎𝙎 𝘾𝙤𝙣𝙛𝙞𝙜:
+ • Host: $domain
+ • SNI: $domain
+ • Port: 8442
+ • Path: /vless
+ • Network: ws
+ • TLS: tls
+
+🌐 𝙑𝙈𝙚𝙨𝙨 𝘾𝙤𝙣𝙛𝙞𝙜:
+ • Host: $domain
+ • SNI: $domain
+ • Port: 8443
+ • Path: /vmess
+ • Network: ws
+ • TLS: tls
 
       💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━
