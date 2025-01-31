@@ -1057,6 +1057,80 @@ get_system_info() {
     fi
 }
 
+# Function to configure Telegram bot
+configure_telegram_bot() {
+    clear
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}         Telegram Bot Configuration              ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    
+    # Check if config file exists
+    if [ ! -d "/etc/vps" ]; then
+        mkdir -p /etc/vps
+    fi
+    
+    if [ -f "/etc/vps/telegram.conf" ]; then
+        current_token=$(cat /etc/vps/telegram.conf | grep "BOT_TOKEN=" | cut -d= -f2)
+        current_username=$(cat /etc/vps/telegram.conf | grep "BOT_USERNAME=" | cut -d= -f2)
+        echo -e "Current Configuration:"
+        echo -e "Bot Username: $current_username"
+        echo -e "Bot Token: $current_token"
+        echo -e ""
+    fi
+    
+    echo -e "1. Set Bot Token"
+    echo -e "2. Set Bot Username"
+    echo -e "3. Start Bot Service"
+    echo -e "4. Stop Bot Service"
+    echo -e "5. Restart Bot Service"
+    echo -e "0. Back to Main Menu"
+    echo -e "${GREEN}=================================================${NC}"
+    read -p "Select option: " bot_config_option
+    
+    case $bot_config_option in
+        1)
+            read -p "Enter Bot Token: " bot_token
+            echo "BOT_TOKEN=$bot_token" > /etc/vps/telegram.conf
+            echo -e "${GREEN}Bot token saved successfully${NC}"
+            ;;
+        2)
+            read -p "Enter Bot Username: " bot_username
+            echo "BOT_USERNAME=$bot_username" >> /etc/vps/telegram.conf
+            echo -e "${GREEN}Bot username saved successfully${NC}"
+            ;;
+        3)
+            if [ -f "/etc/vps/telegram.conf" ]; then
+                screen -dmS telegram_bot bash /usr/local/bin/telegram_handler.sh
+                echo -e "${GREEN}Telegram bot service started${NC}"
+            else
+                echo -e "${RED}Please configure bot token and username first${NC}"
+            fi
+            ;;
+        4)
+            pkill -f "telegram_handler.sh"
+            echo -e "${YELLOW}Telegram bot service stopped${NC}"
+            ;;
+        5)
+            pkill -f "telegram_handler.sh"
+            sleep 2
+            if [ -f "/etc/vps/telegram.conf" ]; then
+                screen -dmS telegram_bot bash /usr/local/bin/telegram_handler.sh
+                echo -e "${GREEN}Telegram bot service restarted${NC}"
+            else
+                echo -e "${RED}Please configure bot token and username first${NC}"
+            fi
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            ;;
+    esac
+    read -n 1 -s -r -p "Press any key to continue"
+    configure_telegram_bot
+}
+
 # Function to manage Telegram bot
 manage_telegram_bot() {
     clear
