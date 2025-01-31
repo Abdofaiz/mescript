@@ -13,6 +13,10 @@ BOT_CONFIG="/etc/vps/telegram.conf"
 # Load bot configuration
 source $BOT_CONFIG
 
+# Add these variables for conversation state
+declare -A USER_STATES
+declare -A TEMP_DATA
+
 # Function to create SSH account
 create_account() {
     local chat_id=$1
@@ -162,11 +166,54 @@ send_message() {
         -d parse_mode="HTML"
 }
 
-# Main command handler
+# Function to handle conversation flow
+handle_conversation() {
+    local chat_id=$1
+    local message=$2
+    local state=${USER_STATES[$chat_id]}
+
+    case $state in
+        "WAITING_USERNAME")
+            # Save username and ask for password
+            TEMP_DATA["${chat_id}_username"]=$message
+            USER_STATES[$chat_id]="WAITING_PASSWORD"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙋𝙖𝙨𝙨 :"
+            ;;
+        "WAITING_PASSWORD")
+            # Save password and ask for duration
+            TEMP_DATA["${chat_id}_password"]=$message
+            USER_STATES[$chat_id]="WAITING_DURATION"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝘿𝙖𝙮𝙨 (1-30):"
+            ;;
+        "WAITING_DURATION")
+            # Validate duration
+            if ! [[ "$message" =~ ^[0-9]+$ ]] || [ "$message" -lt 1 ] || [ "$message" -gt 30 ]; then
+                send_message "$chat_id" "❌ Invalid duration. Please enter a number between 1-30"
+                return
+            fi
+            
+            # Create account with collected data
+            create_account "$chat_id" "${TEMP_DATA["${chat_id}_username"]}" "${TEMP_DATA["${chat_id}_password"]}" "$message"
+            
+            # Clear conversation state
+            unset USER_STATES[$chat_id]
+            unset TEMP_DATA["${chat_id}_username"]
+            unset TEMP_DATA["${chat_id}_password"]
+            ;;
+    esac
+}
+
+# Update the handle_command function
 handle_command() {
     local chat_id=$1
     local command=$2
-    local args=("${@:3}")
+    local message=$3
+    
+    # Check if user is in conversation
+    if [ -n "${USER_STATES[$chat_id]}" ]; then
+        handle_conversation "$chat_id" "$message"
+        return
+    }
     
     case $command in
         "/start" | "/help")
@@ -192,22 +239,8 @@ handle_command() {
             send_message "$chat_id" "$message"
             ;;
         "/create")
-            if [ ${#args[@]} -eq 0 ]; then
-                message="📝 Create New Account\n\n"
-                message+="Usage: /create username password days\n\n"
-                message+="Example:\n"
-                message+="/create test123 pass123 30\n\n"
-                message+="This will create:\n"
-                message+="• Username: test123\n"
-                message+="• Password: pass123\n"
-                message+="• Duration: 30 days"
-                send_message "$chat_id" "$message"
-                return
-            elif [ ${#args[@]} -ne 3 ]; then
-                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /create username password days\nExample: /create test123 pass123 30"
-                return 1
-            fi
-            create_account "$chat_id" "${args[0]}" "${args[1]}" "${args[2]}"
+            USER_STATES[$chat_id]="WAITING_USERNAME"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
             ;;
         "/vless")
             if [ ${#args[@]} -eq 0 ]; then
@@ -268,16 +301,20 @@ handle_command() {
     esac
 }
 
-# Main loop to handle incoming updates
+# Update the main loop to handle messages
 while true; do
-    # Get updates from Telegram
     updates=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$((offset + 1))")
     
-    # Process each update
     while read -r update_id chat_id message; do
         if [ -n "$update_id" ]; then
             offset=$update_id
-            handle_command "$chat_id" $message
+            if [[ "$message" == /* ]]; then
+                # It's a command
+                handle_command "$chat_id" "$message"
+            else
+                # It's a regular message
+                handle_command "$chat_id" "" "$message"
+            fi
         fi
     done < <(echo "$updates" | jq -r '.result[] | "\(.update_id) \(.message.chat.id) \(.message.text)"')
     
