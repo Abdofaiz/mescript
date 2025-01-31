@@ -1057,6 +1057,53 @@ get_system_info() {
     fi
 }
 
+# Function to manage Telegram bot
+manage_telegram_bot() {
+    clear
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}            Telegram Bot Management              ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${GREEN}1.${NC} Add New User"
+    echo -e "${GREEN}2.${NC} Remove User"
+    echo -e "${GREEN}3.${NC} Check User Status"
+    echo -e "${GREEN}4.${NC} Server Status"
+    echo -e "${GREEN}5.${NC} Bot Settings"
+    echo -e "${GREEN}0.${NC} Back to Main Menu"
+    echo -e "${GREEN}=================================================${NC}"
+    read -p "Select option: " bot_option
+
+    case $bot_option in
+        1)
+            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
+            echo -e "Use command: /adduser username password duration"
+            ;;
+        2)
+            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
+            echo -e "Use command: /removeuser username"
+            ;;
+        3)
+            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
+            echo -e "Use command: /status username"
+            ;;
+        4)
+            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
+            echo -e "Use command: /serverstatus"
+            ;;
+        5)
+            echo -e "${YELLOW}Visit Telegram Bot: https://t.me/faizvpn_bot${NC}"
+            echo -e "Use command: /settings"
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            ;;
+    esac
+    read -n 1 -s -r -p "Press any key to continue"
+    manage_telegram_bot
+}
+
 # Main menu display
 show_main_menu() {
     clear
@@ -1081,7 +1128,8 @@ show_main_menu() {
     echo -e "${GREEN}5.${NC} System Settings"
     echo -e "${GREEN}6.${NC} Service Status"
     echo -e "${GREEN}7.${NC} BadVPN Manager"
-    echo -e "${RED}8.${NC} Uninstall All Services"
+    echo -e "${GREEN}8.${NC} Telegram Bot Manager"
+    echo -e "${RED}9.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${GREEN}║            ${YELLOW}Telegram: @faizvpn               ${GREEN}║${NC}"
@@ -1273,6 +1321,9 @@ while true; do
             manage_badvpn
             ;;
         8)
+            manage_telegram_bot
+            ;;
+        9)
             echo -e "${RED}Warning: This will uninstall all VPS services${NC}"
             read -p "Are you sure you want to continue? (y/n): " confirm
             if [[ $confirm == "y" || $confirm == "Y" ]]; then
