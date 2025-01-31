@@ -293,7 +293,7 @@ restart_services() {
 
        ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
 
-    ✅ 𝙎𝙧𝙫𝙞𝙘𝙚�� 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
+    ✅ 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
 
       📋 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙇𝙞𝙨𝙩 𝙇𝙞𝙨𝙩 𝙗𝙖𝙘𝙠 𝙨𝙤𝙤𝙣
          • SSH
@@ -449,12 +449,37 @@ process_xray_creation() {
         local port="8442"
         local path="/vless"
         local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
+        
+        # Add user to Xray config
+        local xray_config="/usr/local/etc/xray/config.json"
+        if [ -f "$xray_config" ]; then
+            # Add VLESS user to config
+            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[0].settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
+            mv "${xray_config}.tmp" "$xray_config"
+            
+            # Restart Xray service
+            systemctl restart xray
+        fi
     else
         local port="8443"
         local path="/vmess"
         local vmess_config="{\"v\":\"2\",\"ps\":\"FAIZ-${username}\",\"add\":\"${domain}\",\"port\":\"${port}\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"path\":\"${path}\",\"type\":\"none\",\"host\":\"${domain}\",\"tls\":\"tls\"}"
         local config=$(echo $vmess_config | base64 -w 0)
+        
+        # Add user to Xray config
+        local xray_config="/usr/local/etc/xray/config.json"
+        if [ -f "$xray_config" ]; then
+            # Add VMess user to config
+            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[1].settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
+            mv "${xray_config}.tmp" "$xray_config"
+            
+            # Restart Xray service
+            systemctl restart xray
+        fi
     fi
+    
+    # Save user info to database
+    echo "${protocol}:${username}:${uuid}:${exp_date}" >> /etc/vps/users.db
     
     send_message "$chat_id" "$(cat << EOF
      ━━━━━━━━━━━━━━━━━━━━━
@@ -537,7 +562,12 @@ process_message() {
             esac
             ;;
         "waiting_xray_username")
-            process_xray_creation "$chat_id" "$message"
+            if [[ -n "$message" ]]; then
+                process_xray_creation "$chat_id" "$message"
+            else
+                send_message "$chat_id" "❌ Invalid username. Please try again."
+                user_states[$chat_id]="none"
+            fi
             ;;
         "waiting_username")
             user_data[$chat_id,username]=$message
