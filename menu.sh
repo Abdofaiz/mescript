@@ -921,197 +921,207 @@ restart_udp_custom() {
 # Main menu loop
 while true; do
     clear
-    echo -e "${GREEN}╔═══════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              ${YELLOW}VPS MANAGEMENT MENU${GREEN}              ║${NC}"
-    echo -e "${GREEN}╚═══════════════════════════════════════════════╝${NC}"
-    echo -e ""
-    echo -e "${YELLOW}SSH & OpenVPN Menu${NC}"
-    echo -e "${CYAN}[1]${NC} • Create SSH & OpenVPN Account"
-    echo -e "${CYAN}[2]${NC} • Delete SSH & OpenVPN Account"
-    echo -e "${CYAN}[3]${NC} • Extend SSH & OpenVPN Account"
-    echo -e "${CYAN}[4]${NC} • Check User Login SSH & OpenVPN"
-    echo -e ""
-    echo -e "${YELLOW}Xray/VMess Menu${NC}"
-    echo -e "${CYAN}[5]${NC} • Create VMess Account"
-    echo -e "${CYAN}[6]${NC} • Delete VMess Account"
-    echo -e "${CYAN}[7]${NC} • Extend VMess Account"
-    echo -e "${CYAN}[8]${NC} • Check User Login VMess"
-    echo -e ""
-    echo -e "${YELLOW}Xray/VLess Menu${NC}"
-    echo -e "${CYAN}[9]${NC} • Create VLess Account"
-    echo -e "${CYAN}[10]${NC} • Delete VLess Account"
-    echo -e "${CYAN}[11]${NC} • Extend VLess Account"
-    echo -e "${CYAN}[12]${NC} • Check User Login VLess"
-    echo -e ""
-    echo -e "${YELLOW}WebSocket Menu${NC}"
-    echo -e "${CYAN}[13]${NC} • Create WebSocket Account"
-    echo -e "${CYAN}[14]${NC} • Delete WebSocket Account"
-    echo -e "${CYAN}[15]${NC} • Extend WebSocket Account"
-    echo -e "${CYAN}[16]${NC} • Check User Login WebSocket"
-    echo -e ""
-    echo -e "${YELLOW}System Menu${NC}"
-    echo -e "${CYAN}[17]${NC} • Add/Change Domain"
-    echo -e "${CYAN}[18]${NC} • Change Port Services"
-    echo -e "${CYAN}[19]${NC} • Check System Status"
-    echo -e "${CYAN}[20]${NC} • Check Running Services"
-    echo -e "${CYAN}[21]${NC} • Check Memory Usage"
-    echo -e "${CYAN}[22]${NC} • Reboot VPS"
-    echo -e "${CYAN}[23]${NC} • Exit"
-    echo -e ""
-    echo -e "${YELLOW}SSH UDP Menu${NC}"
-    echo -e "${CYAN}[24]${NC} • Create SSH UDP Account"
-    echo -e "${CYAN}[25]${NC} • Delete SSH UDP Account"
-    echo -e "${CYAN}[26]${NC} • Check SSH UDP Users"
-    echo -e ""
-    echo -e "${CYAN}[27]${NC} • Start UDP Custom"
-    echo -e "${CYAN}[28]${NC} • Stop UDP Custom"
-    echo -e "${CYAN}[29]${NC} • Restart UDP Custom"
-    echo -e ""
-    echo -e "${CYAN}[30]${NC} • Run Speed Test"
-    echo -e ""
-    read -p "Select menu [1-30]: " choice
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}                VPS Control Panel                ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${GREEN}1.${NC} SSH & OpenVPN Menu"
+    echo -e "${GREEN}2.${NC} Xray Menu"
+    echo -e "${GREEN}3.${NC} UDP Custom Menu"
+    echo -e "${GREEN}4.${NC} System Information"
+    echo -e "${GREEN}5.${NC} System Settings"
+    echo -e "${RED}6.${NC} Uninstall All Services"
+    echo -e "${GREEN}0.${NC} Exit"
+    echo -e "${GREEN}=================================================${NC}"
+    read -p "Select menu: " menu_option
 
-    case $choice in
-        1) 
-            create_ssh_ovpn
-            press_enter
-            ;;
-        2) 
-            delete_ssh_ovpn
-            press_enter
-            ;;
-        3) 
-            extend_ssh_ovpn
-            press_enter
-            ;;
-        4) 
-            check_ssh_ovpn
-            press_enter
-            ;;
-        5) 
-            create_vmess
-            press_enter
-            ;;
-        6) 
-            delete_vmess
-            press_enter
-            ;;
-        7) 
-            extend_vmess
-            press_enter
-            ;;
-        8) 
-            check_vmess
-            press_enter
-            ;;
-        9) 
-            create_vless
-            press_enter
-            ;;
-        10) 
-            delete_vless
-            press_enter
-            ;;
-        11) 
-            extend_vless
-            press_enter
-            ;;
-        12) 
-            check_vless
-            press_enter
-            ;;
-        13) 
-            create_ws
-            press_enter
-            ;;
-        14) 
-            delete_ws
-            press_enter
-            ;;
-        15) 
-            extend_ws
-            press_enter
-            ;;
-        16) 
-            check_ws
-            press_enter
-            ;;
-        17) 
-            change_domain
-            press_enter
-            ;;
-        18) 
-            change_ports
-            press_enter
-            ;;
-        19) 
+    case $menu_option in
+        1)
             clear
-            echo -e "${GREEN}=== System Status ===${NC}"
+            echo -e "${GREEN}=== SSH & OpenVPN Menu ===${NC}"
+            echo -e "${GREEN}1.${NC} Create SSH & OpenVPN Account"
+            echo -e "${GREEN}2.${NC} Delete SSH & OpenVPN Account"
+            echo -e "${GREEN}3.${NC} Extend SSH & OpenVPN Account"
+            echo -e "${GREEN}4.${NC} Check User Login SSH & OpenVPN"
+            echo -e "${GREEN}0.${NC} Back to main menu"
+            read -p "Select option: " ssh_option
+
+            case $ssh_option in
+                1)
+                    create_ssh_ovpn
+                    press_enter
+                    ;;
+                2)
+                    delete_ssh_ovpn
+                    press_enter
+                    ;;
+                3)
+                    extend_ssh_ovpn
+                    press_enter
+                    ;;
+                4)
+                    check_ssh_ovpn
+                    press_enter
+                    ;;
+                0)
+                    continue
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option${NC}"
+                    press_enter
+                    ;;
+            esac
+            ;;
+        2)
+            clear
+            echo -e "${GREEN}=== Xray Menu ===${NC}"
+            echo -e "${GREEN}1.${NC} Create VMess Account"
+            echo -e "${GREEN}2.${NC} Delete VMess Account"
+            echo -e "${GREEN}3.${NC} Extend VMess Account"
+            echo -e "${GREEN}4.${NC} Check User Login VMess"
+            echo -e "${GREEN}5.${NC} Create VLess Account"
+            echo -e "${GREEN}6.${NC} Delete VLess Account"
+            echo -e "${GREEN}7.${NC} Extend VLess Account"
+            echo -e "${GREEN}8.${NC} Check User Login VLess"
+            echo -e "${GREEN}0.${NC} Back to main menu"
+            read -p "Select option: " xray_option
+
+            case $xray_option in
+                1)
+                    create_vmess
+                    press_enter
+                    ;;
+                2)
+                    delete_vmess
+                    press_enter
+                    ;;
+                3)
+                    extend_vmess
+                    press_enter
+                    ;;
+                4)
+                    check_vmess
+                    press_enter
+                    ;;
+                5)
+                    create_vless
+                    press_enter
+                    ;;
+                6)
+                    delete_vless
+                    press_enter
+                    ;;
+                7)
+                    extend_vless
+                    press_enter
+                    ;;
+                8)
+                    check_vless
+                    press_enter
+                    ;;
+                0)
+                    continue
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option${NC}"
+                    press_enter
+                    ;;
+            esac
+            ;;
+        3)
+            clear
+            echo -e "${GREEN}=== UDP Custom Menu ===${NC}"
+            echo -e "${GREEN}1.${NC} Create SSH UDP Account"
+            echo -e "${GREEN}2.${NC} Delete SSH UDP Account"
+            echo -e "${GREEN}3.${NC} Check SSH UDP Users"
+            echo -e "${GREEN}4.${NC} Start UDP Custom"
+            echo -e "${GREEN}5.${NC} Stop UDP Custom"
+            echo -e "${GREEN}6.${NC} Restart UDP Custom"
+            echo -e "${GREEN}0.${NC} Back to main menu"
+            read -p "Select option: " udp_option
+
+            case $udp_option in
+                1)
+                    create_ssh_udp
+                    press_enter
+                    ;;
+                2)
+                    delete_ssh_udp
+                    press_enter
+                    ;;
+                3)
+                    check_ssh_udp
+                    press_enter
+                    ;;
+                4)
+                    start_udp_custom
+                    press_enter
+                    ;;
+                5)
+                    stop_udp_custom
+                    press_enter
+                    ;;
+                6)
+                    restart_udp_custom
+                    press_enter
+                    ;;
+                0)
+                    continue
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option${NC}"
+                    press_enter
+                    ;;
+            esac
+            ;;
+        4)
+            clear
+            echo -e "${GREEN}=== System Information ===${NC}"
             echo -e "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%"
             echo -e "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')"
             echo -e "Disk Usage: $(df -h / | awk 'NR==2{print $5}')"
             press_enter
             ;;
-        20)
+        5)
             clear
-            echo -e "${GREEN}=== Running Services ===${NC}"
-            echo -e "Stunnel: $(systemctl is-active stunnel4)"
-            echo -e "Dropbear: $(systemctl is-active dropbear)"
-            echo -e "Squid: $(systemctl is-active squid)"
-            echo -e "OpenVPN: $(systemctl is-active openvpn)"
-            echo -e "Xray: $(systemctl is-active xray)"
-            echo -e "WebSocket: $(systemctl is-active ws-ssh)"
-            press_enter
+            echo -e "${GREEN}=== System Settings ===${NC}"
+            echo -e "${GREEN}1.${NC} Add/Change Domain"
+            echo -e "${GREEN}2.${NC} Change Port Services"
+            echo -e "${GREEN}0.${NC} Back to main menu"
+            read -p "Select option: " settings_option
+
+            case $settings_option in
+                1)
+                    change_domain
+                    press_enter
+                    ;;
+                2)
+                    change_ports
+                    press_enter
+                    ;;
+                0)
+                    continue
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option${NC}"
+                    press_enter
+                    ;;
+            esac
             ;;
-        21)
-            clear
-            echo -e "${GREEN}=== Memory Usage ===${NC}"
-            free -h
-            press_enter
-            ;;
-        22)
-            read -p "Are you sure you want to reboot? [y/n]: " answer
-            if [ "$answer" == "y" ]; then
-                reboot
+        6)
+            echo -e "${RED}Warning: This will uninstall all VPS services${NC}"
+            read -p "Are you sure you want to continue? (y/n): " confirm
+            if [[ $confirm == "y" || $confirm == "Y" ]]; then
+                wget -O uninstall.sh https://raw.githubusercontent.com/Abdofaiz/mescript/main/uninstall.sh
+                chmod +x uninstall.sh
+                ./uninstall.sh
             fi
-            press_enter
             ;;
-        23) 
+        0)
             clear
-            exit 0 
-            ;;
-        24)
-            create_ssh_udp
-            press_enter
-            ;;
-        25)
-            delete_ssh_udp
-            press_enter
-            ;;
-        26)
-            check_ssh_udp
-            press_enter
-            ;;
-        27)
-            start_udp_custom
-            press_enter
-            ;;
-        28)
-            stop_udp_custom
-            press_enter
-            ;;
-        29)
-            restart_udp_custom
-            press_enter
-            ;;
-        30)
-            clear
-            echo -e "${GREEN}=== Network Speed Test ===${NC}"
-            speedtest
-            press_enter
+            exit 0
             ;;
         *)
-            echo -e "${RED}Please enter a number between 1 and 30${NC}"
+            echo -e "${RED}Invalid option${NC}"
             press_enter
             ;;
     esac
