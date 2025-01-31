@@ -135,47 +135,79 @@ check_ssh_ovpn() {
     clear
     echo -e "${GREEN}=== SSH & OpenVPN User Status ===${NC}"
     
-    echo -e "\nOnline Users:"
-    echo -e "${YELLOW}"
-    # Check different connection types
-    echo -e "SSH Connections:"
-    netstat -natp | grep 'ESTABLISHED.*sshd' | awk '{print $5}' | cut -d: -f1 | sort | uniq
+    echo -e "\n${YELLOW}Online Users:${NC}"
     
-    echo -e "\nSSL/TLS Connections:"
-    netstat -natp | grep 'ESTABLISHED.*stunnel' | awk '{print $5}' | cut -d: -f1 | sort | uniq
-    
-    echo -e "\nDropbear Connections:"
-    netstat -natp | grep 'ESTABLISHED.*dropbear' | awk '{print $5}' | cut -d: -f1 | sort | uniq
-    
-    echo -e "\nOpenVPN Connections:"
+    echo -e "\n${GREEN}SSH & SSL/TLS Connections:${NC}"
+    echo -e "Username       IP Address       Connected Since"
+    echo -e "------------------------------------------------"
+    # Get all SSH connections including SSL/TLS
+    data=($(netstat -anp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | awk '{print $5}' | cut -d: -f1))
+    for ip in "${data[@]}"
+    do
+        user=$(lsof -n | grep -i "established.*$ip" | awk '{print $3}' | grep -v '^root$' | uniq)
+        if [[ ! -z "$user" ]]; then
+            connected_time=$(who | grep "$user" | awk '{print $3 " " $4}')
+            printf "%-14s %-15s %s\n" "$user" "$ip" "$connected_time"
+        fi
+    done
+
+    echo -e "\n${GREEN}Dropbear Connections:${NC}"
+    echo -e "Username       IP Address       Connected Since"
+    echo -e "------------------------------------------------"
+    # Get Dropbear connections
+    data=($(netstat -anp | grep 'ESTABLISHED.*dropbear' | awk '{print $5}' | cut -d: -f1))
+    for ip in "${data[@]}"
+    do
+        user=$(ps aux | grep -i dropbear | grep -i -w "$ip" | awk '{print $11}' | cut -d'/' -f2 | grep -v '^root$' | uniq)
+        if [[ ! -z "$user" ]]; then
+            connected_time=$(who | grep "$user" | awk '{print $3 " " $4}')
+            printf "%-14s %-15s %s\n" "$user" "$ip" "$connected_time"
+        fi
+    done
+
     if [ -f "/etc/openvpn/openvpn-status.log" ]; then
-        grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | tail -n +2 | awk '{print $2}'
+        echo -e "\n${GREEN}OpenVPN Connections:${NC}"
+        echo -e "Username       IP Address       Connected Since"
+        echo -e "------------------------------------------------"
+        grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | tail -n +2 | while read line; do
+            user=$(echo $line | awk '{print $2}')
+            ip=$(echo $line | awk '{print $3}' | cut -d: -f1)
+            since=$(echo $line | awk '{print $5 " " $6}')
+            printf "%-14s %-15s %s\n" "$user" "$ip" "$since"
+        done
     fi
-    echo -e "${NC}"
     
-    echo -e "\nUser List:"
-    echo -e "Username | Expiry Date | Status | Connections"
-    echo -e "----------------------------------------"
+    echo -e "\n${GREEN}User Account Status:${NC}"
+    echo -e "Username | Expiry Date | Status | Active Connections"
+    echo -e "------------------------------------------------"
     while IFS=: read -r type username _ expiry; do
         if [[ "$type" == "ssh" ]]; then
-            # Get number of connections for this user
-            conn_count=$(ps -u "$username" | grep -v "ps" | wc -l)
+            # Count active connections for this user across all services
+            ssh_count=$(netstat -anp | grep 'ESTABLISHED.*sshd' | grep -w "$username" | wc -l)
+            ssl_count=$(netstat -anp | grep 'ESTABLISHED.*stunnel' | grep -w "$username" | wc -l)
+            db_count=$(netstat -anp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | wc -l)
+            ovpn_count=0
+            if [ -f "/etc/openvpn/openvpn-status.log" ]; then
+                ovpn_count=$(grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | grep -w "$username" | wc -l)
+            fi
+            total_conn=$((ssh_count + ssl_count + db_count + ovpn_count))
             
             if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
                 status="${GREEN}Active${NC}"
             else
                 status="${RED}Expired${NC}"
             fi
-            echo -e "$username | $expiry | $status | $conn_count"
+            printf "%-9s | %-11s | %-7s | SSH:%d SSL:%d DB:%d OVPN:%d (Total:%d)\n" \
+                "$username" "$expiry" "$status" "$ssh_count" "$ssl_count" "$db_count" "$ovpn_count" "$total_conn"
         fi
     done < $USER_DB
     
-    # Show detailed connection info
-    echo -e "\nDetailed Connection Info:"
-    echo -e "${YELLOW}"
-    ps aux | grep -v grep | grep -v ps | grep -i dropbear | grep -i -w "`who | cut -d ' ' -f1 | grep -v 'root' | uniq`"
-    ps aux | grep -v grep | grep -v ps | grep sshd | grep -v root | grep priv
-    echo -e "${NC}"
+    echo -e "\n${YELLOW}Connection Summary:${NC}"
+    echo -e "Total SSH/SSL : $(netstat -anp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | wc -l)"
+    echo -e "Total Dropbear: $(netstat -anp | grep 'ESTABLISHED.*dropbear' | wc -l)"
+    if [ -f "/etc/openvpn/openvpn-status.log" ]; then
+        echo -e "Total OpenVPN : $(grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | wc -l)"
+    fi
     
     read -n 1 -s -r -p "Press any key to continue"
 }
