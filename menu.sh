@@ -140,6 +140,24 @@ check_ssh_ovpn() {
     echo -e "                 FAIZ-VPN USER STATUS"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
+    # Filter out common service IPs
+    EXCLUDE_IPS=(
+        "127.0.0.1"
+        "157.240."      # Facebook
+        "142.250."      # Google
+        "172.217."      # Google
+        "216.58."       # Google
+        "216.239."      # Google
+        "173.194."      # Google
+        "20.33."        # Microsoft
+        "20.47."        # Microsoft
+        "149.154."      # Telegram
+    )
+
+    # Create exclude pattern
+    EXCLUDE_PATTERN=$(printf "|%s" "${EXCLUDE_IPS[@]}")
+    EXCLUDE_PATTERN=${EXCLUDE_PATTERN:1}
+
     # First show active connections summary
     echo -e "\n${YELLOW}Active Users Summary:${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -148,8 +166,9 @@ check_ssh_ovpn() {
 
     while IFS=: read -r type username _ expiry; do
         if [[ "$type" == "ssh" ]]; then
-            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | wc -l)
-            db_count=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | wc -l)
+            # Count only non-service connections
+            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | grep -vE "$EXCLUDE_PATTERN" | wc -l)
+            db_count=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | grep -vE "$EXCLUDE_PATTERN" | wc -l)
             total=$((ssh_count + db_count))
             
             if [ $total -gt 0 ]; then
@@ -158,14 +177,15 @@ check_ssh_ovpn() {
         fi
     done < $USER_DB
     
-    # Then show detailed connection information for users with active connections
+    # Then show detailed connection information
     echo -e "\n${YELLOW}Detailed Connection Info:${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     while IFS=: read -r type username _ expiry; do
         if [[ "$type" == "ssh" ]]; then
-            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | wc -l)
-            db_count=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | wc -l)
+            # Get real connections
+            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | grep -vE "$EXCLUDE_PATTERN" | wc -l)
+            db_count=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | grep -vE "$EXCLUDE_PATTERN" | wc -l)
             total=$((ssh_count + db_count))
             
             if [ $total -gt 0 ]; then
@@ -180,7 +200,7 @@ check_ssh_ovpn() {
                 # Show SSH/SSL connections
                 if [ $ssh_count -gt 0 ]; then
                     echo -e "\n${YELLOW}SSH/SSL Connections:${NC}"
-                    netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | \
+                    netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | grep -vE "$EXCLUDE_PATTERN" | \
                     while read line; do
                         ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
                         port=$(echo $line | awk '{print $5}' | cut -d: -f2)
@@ -195,7 +215,7 @@ check_ssh_ovpn() {
                 # Show Dropbear connections
                 if [ $db_count -gt 0 ]; then
                     echo -e "\n${YELLOW}Dropbear Connections:${NC}"
-                    netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | \
+                    netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | grep -vE "$EXCLUDE_PATTERN" | \
                     while read line; do
                         ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
                         port=$(echo $line | awk '{print $5}' | cut -d: -f2)
@@ -215,6 +235,13 @@ check_ssh_ovpn() {
             fi
         fi
     done < $USER_DB
+
+    # Show total connections
+    total_ssh=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -vE "$EXCLUDE_PATTERN" | wc -l)
+    total_db=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -vE "$EXCLUDE_PATTERN" | wc -l)
+    echo -e "\n${YELLOW}Total Active Connections:${NC}"
+    echo -e "• Real Users: $((total_ssh + total_db))"
+    echo -e "• System Services: $(netstat -natp | grep 'ESTABLISHED.*\(sshd\|stunnel\|dropbear\)' | grep -E "$EXCLUDE_PATTERN" | wc -l)"
 
     echo -e "\n${YELLOW}Support: @faizvpn${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
