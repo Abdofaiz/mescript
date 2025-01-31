@@ -424,27 +424,69 @@ EOF
 )"
 }
 
-# Function to create VLESS user
-create_vless_user() {
+# Function to create Xray user
+create_xray_user() {
+    local chat_id=$1
+    local protocol=$2
+    
+    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
+    user_states[$chat_id]="waiting_xray_username"
+    user_data[$chat_id,protocol]=$protocol
+}
+
+# Function to process Xray user creation
+process_xray_creation() {
     local chat_id=$1
     local username=$2
+    local protocol=${user_data[$chat_id,protocol]}
     
     # Generate UUID
     local uuid=$(uuidgen)
     local domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
     local exp_date=$(date -d "+30 days" +"%Y-%m-%d")
-    local port="8442"
-    local path="/vless"
     
-    # Create VLESS config string
-    local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
+    if [[ "$protocol" == "vless" ]]; then
+        local port="8442"
+        local path="/vless"
+        local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
+        
+        # Add user to Xray config
+        local xray_config="/usr/local/etc/xray/config.json"
+        if [ -f "$xray_config" ]; then
+            # Add VLESS user to config
+            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[0].settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
+            mv "${xray_config}.tmp" "$xray_config"
+            
+            # Restart Xray service
+            systemctl restart xray
+        fi
+    else
+        local port="8443"
+        local path="/vmess"
+        local vmess_config="{\"v\":\"2\",\"ps\":\"FAIZ-${username}\",\"add\":\"${domain}\",\"port\":\"${port}\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"path\":\"${path}\",\"type\":\"none\",\"host\":\"${domain}\",\"tls\":\"tls\"}"
+        local config=$(echo $vmess_config | base64 -w 0)
+        
+        # Add user to Xray config
+        local xray_config="/usr/local/etc/xray/config.json"
+        if [ -f "$xray_config" ]; then
+            # Add VMess user to config
+            jq --arg uuid "$uuid" --arg username "$username" '.inbounds[1].settings.clients += [{"id": $uuid, "email": $username}]' "$xray_config" > "${xray_config}.tmp"
+            mv "${xray_config}.tmp" "$xray_config"
+            
+            # Restart Xray service
+            systemctl restart xray
+        fi
+    fi
+    
+    # Save user info to database
+    echo "${protocol}:${username}:${uuid}:${exp_date}" >> /etc/vps/users.db
     
     send_message "$chat_id" "$(cat << EOF
      ━━━━━━━━━━━━━━━━━━━━━
        🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
      ━━━━━━━━━━━━━━━━━━━━━
 
-✅ VLESS Account Created!
+✅ ${protocol^^} Account Created!
 
 👤 Username: $username
 🔑 UUID: $uuid
@@ -458,16 +500,20 @@ create_vless_user() {
 • Network: ws
 • TLS: tls
 
-📝 VLESS Config:
+📝 ${protocol^^} Config:
 <code>$config</code>
 
       💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━
 EOF
 )"
+    
+    # Reset state
+    user_states[$chat_id]="none"
+    unset user_data[$chat_id,protocol]
 }
 
-# Function to process messages
+# Process messages
 process_message() {
     local chat_id=$1
     local message=$2
@@ -475,56 +521,75 @@ process_message() {
     # Get current state
     local state=${user_states[$chat_id]:-"none"}
     
-    # Handle states first
     case $state in
-        "waiting_vless_username")
-            create_vless_user "$chat_id" "$message"
-            user_states[$chat_id]="none"
-            return
+        "none")
+            case $message in
+                "/start")
+                    show_welcome "$chat_id"
+                    ;;
+                "/create")
+                    user_states[$chat_id]="waiting_username"
+                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
+                    ;;
+                "/vless")
+                    create_xray_user "$chat_id" "vless"
+                    ;;
+                "/vmess")
+                    create_xray_user "$chat_id" "vmess"
+                    ;;
+                "/status")
+                    check_server_status "$chat_id"
+                    ;;
+                "/server")
+                    server_status "$chat_id"
+                    ;;
+                "/restart")
+                    restart_services "$chat_id"
+                    ;;
+                "/reboot")
+                    reboot_server "$chat_id"
+                    ;;
+                "/help")
+                    show_help "$chat_id"
+                    ;;
+                "/delete")
+                    user_states[$chat_id]="waiting_delete_username"
+                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+                    ;;
+                *)
+                    send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
+                    ;;
+            esac
             ;;
-        "waiting_vmess_username")
-            create_vmess_user "$chat_id" "$message"
+        "waiting_xray_username")
+            if [[ -n "$message" ]]; then
+                process_xray_creation "$chat_id" "$message"
+            else
+                send_message "$chat_id" "❌ Invalid username. Please try again."
+                user_states[$chat_id]="none"
+            fi
+            ;;
+        "waiting_username")
+            user_data[$chat_id,username]=$message
+            user_states[$chat_id]="waiting_password"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙋𝙖𝙨𝙨 :"
+            ;;
+        "waiting_password")
+            user_data[$chat_id,password]=$message
+            user_states[$chat_id]="waiting_duration"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣 (𝘿𝙖𝙮𝙨) :"
+            ;;
+        "waiting_duration")
+            local username=${user_data[$chat_id,username]}
+            local password=${user_data[$chat_id,password]}
+            create_user "$chat_id" "$username" "$password" "$message"
             user_states[$chat_id]="none"
-            return
+            unset user_data[$chat_id,username]
+            unset user_data[$chat_id,password]
             ;;
         "waiting_delete_username")
             delete_user "$chat_id" "$message"
             user_states[$chat_id]="none"
-            return
-            ;;
-    esac
-    
-    # Handle commands
-    case "$message" in
-        "/start")
-            show_welcome "$chat_id"
-            ;;
-        "/vless")
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
-            user_states[$chat_id]="waiting_vless_username"
-            ;;
-        "/vmess")
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
-            user_states[$chat_id]="waiting_vmess_username"
-            ;;
-        "/status")
-            check_server_status "$chat_id"
-            ;;
-        "/server")
-            server_status "$chat_id"
-            ;;
-        "/restart")
-            restart_services "$chat_id"
-            ;;
-        "/reboot")
-            reboot_server "$chat_id"
-            ;;
-        "/delete")
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
-            user_states[$chat_id]="waiting_delete_username"
-            ;;
-        *)
-            show_welcome "$chat_id"
             ;;
     esac
 }
