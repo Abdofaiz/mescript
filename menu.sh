@@ -134,23 +134,48 @@ extend_ssh_ovpn() {
 check_ssh_ovpn() {
     clear
     echo -e "${GREEN}=== SSH & OpenVPN User Status ===${NC}"
+    
     echo -e "\nOnline Users:"
     echo -e "${YELLOW}"
-    who | grep -v "root"
+    # Check different connection types
+    echo -e "SSH Connections:"
+    netstat -natp | grep 'ESTABLISHED.*sshd' | awk '{print $5}' | cut -d: -f1 | sort | uniq
+    
+    echo -e "\nSSL/TLS Connections:"
+    netstat -natp | grep 'ESTABLISHED.*stunnel' | awk '{print $5}' | cut -d: -f1 | sort | uniq
+    
+    echo -e "\nDropbear Connections:"
+    netstat -natp | grep 'ESTABLISHED.*dropbear' | awk '{print $5}' | cut -d: -f1 | sort | uniq
+    
+    echo -e "\nOpenVPN Connections:"
+    if [ -f "/etc/openvpn/openvpn-status.log" ]; then
+        grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | tail -n +2 | awk '{print $2}'
+    fi
     echo -e "${NC}"
+    
     echo -e "\nUser List:"
-    echo -e "Username | Expiry Date | Status"
-    echo -e "--------------------------------"
+    echo -e "Username | Expiry Date | Status | Connections"
+    echo -e "----------------------------------------"
     while IFS=: read -r type username _ expiry; do
         if [[ "$type" == "ssh" ]]; then
+            # Get number of connections for this user
+            conn_count=$(ps -u "$username" | grep -v "ps" | wc -l)
+            
             if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
                 status="${GREEN}Active${NC}"
             else
                 status="${RED}Expired${NC}"
             fi
-            echo -e "$username | $expiry | $status"
+            echo -e "$username | $expiry | $status | $conn_count"
         fi
     done < $USER_DB
+    
+    # Show detailed connection info
+    echo -e "\nDetailed Connection Info:"
+    echo -e "${YELLOW}"
+    ps aux | grep -v grep | grep -v ps | grep -i dropbear | grep -i -w "`who | cut -d ' ' -f1 | grep -v 'root' | uniq`"
+    ps aux | grep -v grep | grep -v ps | grep sshd | grep -v root | grep priv
+    echo -e "${NC}"
     
     read -n 1 -s -r -p "Press any key to continue"
 }
