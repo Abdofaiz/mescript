@@ -1032,23 +1032,19 @@ show_service_status() {
 
 # Function to get system information
 get_system_info() {
-    # Get IP addresses
-    IPVPS=$(curl -s ipv4.icanhazip.com)
+    # Get IP addresses (with timeout to prevent hanging)
+    IPVPS=$(curl -s --max-time 5 ipv4.icanhazip.com || echo "Unable to get IP")
     
-    # Get CPU load
-    CPU_LOAD=$(uptime | awk -F'load average:' '{print $2}' | awk -F',' '{print $1}' | tr -d ' ')
+    # Get CPU load (simplified for reliability)
+    CPU_LOAD=$(cat /proc/loadavg | awk '{print $1}')
     
-    # Get RAM usage
-    TOTAL_RAM=$(free -m | awk '/Mem:/ {print $2}')
-    USED_RAM=$(free -m | awk '/Mem:/ {print $3}')
-    RAM_PERCENT=$((USED_RAM * 100 / TOTAL_RAM))
+    # Get RAM usage (simplified calculation)
+    TOTAL_RAM=$(free -m | grep Mem | awk '{print $2}')
+    USED_RAM=$(free -m | grep Mem | awk '{print $3}')
+    RAM_PERCENT=$(( (USED_RAM * 100) / TOTAL_RAM ))
     
     # Get domain if exists
-    if [ -f "/etc/vps/domain" ]; then
-        DOMAIN=$(cat /etc/vps/domain)
-    else
-        DOMAIN="Not Set"
-    fi
+    DOMAIN=$(cat /etc/vps/domain 2>/dev/null || echo "Not Set")
 }
 
 # Main menu with system info
