@@ -1444,14 +1444,15 @@ fix_stunnel() {
     echo -e "                Fix Stunnel4 Service"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-    echo -e "${YELLOW}Fixing Stunnel4 configuration...${NC}"
-    
+    # Install stunnel if not installed
+    apt-get install -y stunnel4
+
     # Stop the service first
     systemctl stop stunnel4
 
     # Create proper stunnel config directory if it doesn't exist
     mkdir -p /etc/stunnel
-    
+
     # Create proper stunnel config
     cat > /etc/stunnel/stunnel.conf <<EOF
 pid = /var/run/stunnel4.pid
@@ -1464,21 +1465,24 @@ TIMEOUTclose = 0
 [dropbear]
 accept = 443
 connect = 127.0.0.1:109
+TIMEOUTidle = 300
 
 [openssh]
 accept = 777
 connect = 127.0.0.1:22
+TIMEOUTidle = 300
 
 [openvpn]
 accept = 442
 connect = 127.0.0.1:1194
+TIMEOUTidle = 300
 EOF
 
     # Create SSL certificate if it doesn't exist
     if [ ! -f "/etc/stunnel/stunnel.pem" ]; then
         echo -e "\n${YELLOW}Creating new SSL Certificate...${NC}"
         openssl genrsa -out /etc/stunnel/stunnel.key 2048
-        openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=FAIZ-VPN"
+        openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=$(curl -s ipv4.icanhazip.com)"
         openssl x509 -req -days 3650 -in /etc/stunnel/stunnel.csr -signkey /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt
         cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
     fi
@@ -1487,8 +1491,7 @@ EOF
     chmod 600 /etc/stunnel/stunnel.pem
     
     # Enable stunnel in default config
-    echo -e "\n${YELLOW}Enabling Stunnel4 service...${NC}"
-    sed -i 's/ENABLED=0/ENABLED=1/' /etc/default/stunnel4
+    echo "ENABLED=1" > /etc/default/stunnel4
 
     # Create systemd service file
     cat > /etc/systemd/system/stunnel4.service <<EOF
@@ -1507,12 +1510,19 @@ TimeoutSec=600
 WantedBy=multi-user.target
 EOF
 
+    # Fix common network issues
+    sysctl -w net.ipv4.tcp_timestamps=1
+    sysctl -w net.ipv4.tcp_window_scaling=1
+    sysctl -w net.ipv4.tcp_sack=1
+    sysctl -w net.ipv4.tcp_fin_timeout=30
+    sysctl -w net.ipv4.tcp_keepalive_time=1200
+    sysctl -w net.ipv4.tcp_max_syn_backlog=4096
+
     # Reload systemd and restart stunnel
-    echo -e "\n${YELLOW}Restarting Stunnel4 service...${NC}"
     systemctl daemon-reload
     systemctl enable stunnel4
     systemctl restart stunnel4
-    
+
     # Check if service is running
     if systemctl is-active --quiet stunnel4; then
         echo -e "\n${GREEN}Stunnel4 service has been fixed and is running!${NC}"
@@ -1520,13 +1530,62 @@ EOF
         echo -e "• SSL/TLS Dropbear : 443"
         echo -e "• SSL/TLS OpenSSH  : 777"
         echo -e "• SSL/TLS OpenVPN  : 442"
+        
+        # Show connection status
+        echo -e "\n${YELLOW}Service Status:${NC}"
+        echo -e "• Stunnel4: $(systemctl is-active stunnel4)"
+        echo -e "• Dropbear: $(systemctl is-active dropbear)"
+        echo -e "• OpenSSH: $(systemctl is-active ssh)"
+        
+        # Show listening ports
+        echo -e "\n${YELLOW}Listening Ports:${NC}"
+        netstat -tulpn | grep -E 'stunnel|dropbear|sshd'
     else
         echo -e "\n${RED}Failed to start Stunnel4. Checking logs...${NC}"
         journalctl -u stunnel4 --no-pager | tail -n 10
     fi
-    
-    echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    read -n 1 -s -r -p "Press any key to continue"
+}
+
+# Add this function to menu.sh
+fix_ssh_config() {
+    clear
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "            Fix SSH Connection Issues"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    # Backup original config
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+
+    # Update SSH configuration
+    cat > /etc/ssh/sshd_config <<EOF
+Port 22
+Protocol 2
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+UsePAM yes
+ClientAliveInterval 120
+ClientAliveCountMax 3
+MaxAuthTries 6
+PubkeyAuthentication yes
+PermitRootLogin yes
+PasswordAuthentication yes
+ChallengeResponseAuthentication no
+KerberosAuthentication no
+GSSAPIAuthentication no
+X11Forwarding yes
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+EOF
+
+    # Restart SSH service
+    systemctl restart ssh
+
+    echo -e "\n${GREEN}SSH configuration has been updated!${NC}"
+    echo -e "• ClientAliveInterval: 120 seconds"
+    echo -e "• ClientAliveCountMax: 3"
+    echo -e "• MaxAuthTries: 6"
 }
 
 # Main menu display
@@ -1722,6 +1781,7 @@ while true; do
             echo -e "${GREEN}1.${NC} Add/Change Domain"
             echo -e "${GREEN}2.${NC} Change Port Services"
             echo -e "${GREEN}3.${NC} Fix Stunnel4 Service"
+            echo -e "${GREEN}4.${NC} Fix SSH Config"
             echo -e "${GREEN}0.${NC} Back to main menu"
             echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             read -p "Select option: " settings_option
@@ -1737,6 +1797,10 @@ while true; do
                     ;;
                 3)
                     fix_stunnel
+                    press_enter
+                    ;;
+                4)
+                    fix_ssh_config
                     press_enter
                     ;;
                 0)
