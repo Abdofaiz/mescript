@@ -199,6 +199,12 @@ show_welcome() {
           ⚡ /create
      𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
 
+          🌐 /vless
+       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙇𝙀𝙎𝙎 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
+
+          🌐 /vmess
+       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙈𝙚𝙨𝙨 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
+
           🗑️ /delete
        𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧
 
@@ -287,7 +293,7 @@ restart_services() {
 
        ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
 
-    ✅ 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
+    ✅ 𝙎𝙧𝙫𝙞𝙘𝙚�� 𝙖𝙧𝙩𝙖𝙧𝙩𝙚𝙙!
 
       📋 𝙎𝙧𝙫𝙞𝙘𝙚𝙨 𝙇𝙞𝙨𝙩 𝙇𝙞𝙨𝙩 𝙗𝙖𝙘𝙠 𝙨𝙤𝙤𝙣
          • SSH
@@ -418,6 +424,70 @@ EOF
 )"
 }
 
+# Function to create Xray user
+create_xray_user() {
+    local chat_id=$1
+    local protocol=$2
+    
+    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
+    user_states[$chat_id]="waiting_xray_username"
+    user_data[$chat_id,protocol]=$protocol
+}
+
+# Function to process Xray user creation
+process_xray_creation() {
+    local chat_id=$1
+    local username=$2
+    local protocol=${user_data[$chat_id,protocol]}
+    
+    # Generate UUID
+    local uuid=$(uuidgen)
+    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || curl -s ipv4.icanhazip.com)
+    local exp_date=$(date -d "+30 days" +"%Y-%m-%d")
+    
+    if [[ "$protocol" == "vless" ]]; then
+        local port="8442"
+        local path="/vless"
+        local config="vless://${uuid}@${domain}:${port}?path=${path}&security=tls&encryption=none&type=ws#FAIZ-${username}"
+    else
+        local port="8443"
+        local path="/vmess"
+        local vmess_config="{\"v\":\"2\",\"ps\":\"FAIZ-${username}\",\"add\":\"${domain}\",\"port\":\"${port}\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"path\":\"${path}\",\"type\":\"none\",\"host\":\"${domain}\",\"tls\":\"tls\"}"
+        local config=$(echo $vmess_config | base64 -w 0)
+    fi
+    
+    send_message "$chat_id" "$(cat << EOF
+     ━━━━━━━━━━━━━━━━━━━━━
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
+     ━━━━━━━━━━━━━━━━━━━━━
+
+✅ ${protocol^^} Account Created!
+
+👤 Username: $username
+🔑 UUID: $uuid
+📅 Expired: $exp_date
+
+🌐 Configuration:
+• Host: $domain
+• SNI: $domain
+• Port: $port
+• Path: $path
+• Network: ws
+• TLS: tls
+
+📝 ${protocol^^} Config:
+<code>$config</code>
+
+      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
+━━━━━━━━━━━━━━━━━━━━━
+EOF
+)"
+    
+    # Reset state
+    user_states[$chat_id]="none"
+    unset user_data[$chat_id,protocol]
+}
+
 # Process messages
 process_message() {
     local chat_id=$1
@@ -436,6 +506,12 @@ process_message() {
                     user_states[$chat_id]="waiting_username"
                     send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
                     ;;
+                "/vless")
+                    create_xray_user "$chat_id" "vless"
+                    ;;
+                "/vmess")
+                    create_xray_user "$chat_id" "vmess"
+                    ;;
                 "/status")
                     check_server_status "$chat_id"
                     ;;
@@ -451,10 +527,6 @@ process_message() {
                 "/help")
                     show_help "$chat_id"
                     ;;
-                "/info")
-                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝘾𝙝𝙚𝙘𝙠:"
-                    user_states[$chat_id]="waiting_info_username"
-                    ;;
                 "/delete")
                     user_states[$chat_id]="waiting_delete_username"
                     send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
@@ -463,6 +535,9 @@ process_message() {
                     send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
                     ;;
             esac
+            ;;
+        "waiting_xray_username")
+            process_xray_creation "$chat_id" "$message"
             ;;
         "waiting_username")
             user_data[$chat_id,username]=$message
