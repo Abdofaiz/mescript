@@ -146,7 +146,7 @@ $server_details
 # Function to show welcome message
 show_welcome() {
     local chat_id=$1
-    send_message "$chat_id" "\
+    send_message "$chat_id" "$(cat << 'EOF'
 ╔═══════════════════════╗
 ║    ⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡     ║
 ║      𝙋𝙍𝙀𝙈𝙄𝙐𝙈        ║
@@ -171,7 +171,9 @@ show_welcome() {
 ╚═══════════════════════╝
 
      ⭐️ 𝙋𝙍𝙀𝙈𝙄𝙐𝙈 ⭐️
-   𝙑𝙋𝙉 𝙎𝙀𝙍𝙑𝙄𝘾𝙀 𝙋𝙍𝙊𝙑𝙄𝘿𝙀𝙍"
+   𝙑𝙋𝙉 𝙎𝙀𝙍𝙑𝙄𝘾𝙀 𝙋𝙍𝙊𝙑𝙄𝘿𝙀𝙍
+EOF
+)"
 }
 
 # Function to show help message
@@ -212,8 +214,7 @@ process_message() {
                     send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
                     ;;
                 "/status")
-                    user_states[$chat_id]="waiting_username"
-                    send_message "$chat_id" "❌ Usage: /status <username>\n\nExample: /status john"
+                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝘾𝙝𝙚𝙘𝙠:"
                     ;;
                 "/server")
                     server_status "$chat_id"
@@ -222,7 +223,7 @@ process_message() {
                     show_help "$chat_id"
                     ;;
                 *)
-                    send_message "$chat_id" "𝙐𝙨𝙚 /create 𝙩𝙤 𝙘𝙧𝙚𝙖𝙩𝙚 𝙣𝙚𝙬 𝙪𝙨𝙚𝙧"
+                    send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
                     ;;
             esac
             ;;
