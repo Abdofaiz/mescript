@@ -21,6 +21,33 @@ send_message() {
     curl -s -X POST "$API_URL/sendMessage" -d "chat_id=$chat_id" -d "text=$text" -d "parse_mode=HTML"
 }
 
+# Function to get server details
+get_server_details() {
+    local domain=$(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
+    local ip=$(curl -s ipv4.icanhazip.com)
+    
+    # Get ports from configuration
+    local ssl_port=$(cat /etc/vps/ssl.conf 2>/dev/null || echo '443')
+    local ssh_port=$(cat /etc/vps/ssh.conf 2>/dev/null || echo '22')
+    local ws_port=$(cat /etc/vps/ws.conf 2>/dev/null || echo '80')
+    local udp_port=$(cat /etc/vps/udp.conf 2>/dev/null || echo '7300')
+    local badvpn_port=$(cat /etc/vps/badvpn.conf 2>/dev/null || echo '7300')
+    
+    echo "\
+🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
+📍 𝙄𝙋: $ip
+🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $domain
+
+📡 𝙋𝙤𝙧𝙩 𝙄𝙣𝙛𝙤:
+🔒 𝙎𝙎𝙇: $domain:$ssl_port
+🔑 𝙎𝙎𝙃: $ip:$ssh_port
+🌐 𝙒𝙚𝙗𝙨𝙤𝙘𝙠𝙚𝙩: $domain:$ws_port
+🚀 𝘽𝙖𝙙𝙫𝙥𝙣: $ip:$badvpn_port
+
+🔰 𝙐𝘿𝙋 𝘾𝙤𝙣𝙛𝙞𝙜:
+$ip:$udp_port@\$username:\$password"
+}
+
 # Function to create user
 create_user() {
     local chat_id=$1
@@ -32,6 +59,9 @@ create_user() {
     useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
     
+    # Get server details with actual username and password
+    local server_details=$(get_server_details | sed "s/\$username/$username/g" | sed "s/\$password/$password/g")
+    
     send_message "$chat_id" "\
 ━━━━━━━━━━━━━━━━━━━━━
        🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
@@ -42,11 +72,9 @@ create_user() {
 👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username
 🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password
 ⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: $duration days
-
-🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
-📍 𝙄𝙋: $(curl -s ipv4.icanhazip.com)
-🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
 📅 𝙀𝙭𝙥𝙞𝙧𝙮: $(date -d "+$duration days" +"%Y-%m-%d")
+
+$server_details
 
 💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
@@ -94,7 +122,7 @@ check_user_status() {
     fi
 }
 
-# Function to get server status
+# Function to show server status
 server_status() {
     local chat_id=$1
     
@@ -102,8 +130,23 @@ server_status() {
     local memory=$(free -m | grep Mem | awk '{printf("%.2f%%", $3/$2*100)}')
     local disk=$(df -h / | awk 'NR==2 {print $5}')
     local uptime=$(uptime -p)
+    local server_details=$(get_server_details)
     
-    send_message "$chat_id" "🖥 Server Status\n\n📊 CPU Load: $cpu_load\n💾 Memory Usage: $memory\n💿 Disk Usage: $disk\n⏰ Uptime: $uptime\n\n🌐 Server Info:\nIP: $(curl -s ipv4.icanhazip.com)\nDomain: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')"
+    send_message "$chat_id" "\
+━━━━━━━━━━━━━━━━━━━━━
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍
+━━━━━━━━━━━━━━━━━━━━━
+
+📊 𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨:
+📱 𝘾𝙋𝙐 𝙇𝙤𝙖𝙙: $cpu_load
+💾 𝙈𝙚𝙢𝙤𝙧𝙮: $memory
+💿 𝘿𝙞𝙨𝙠: $disk
+⏰ 𝙐𝙥𝙩𝙞𝙢𝙚: $uptime
+
+$server_details
+
+💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
+━━━━━━━━━━━━━━━━━━━━━"
 }
 
 # Function to show help message
