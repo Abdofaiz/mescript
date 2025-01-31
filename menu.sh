@@ -133,86 +133,88 @@ extend_ssh_ovpn() {
 # Function to check SSH & OpenVPN users
 check_ssh_ovpn() {
     clear
-    echo -e "${GREEN}=== SSH & OpenVPN User Status ===${NC}"
-    
-    echo -e "\n${YELLOW}Connection Details by User:${NC}"
-    echo -e "${GREEN}------------------------------------------------${NC}"
-    
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "               🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙐𝙎𝙀𝙍 𝙎𝙏𝘼𝙏𝙐𝙎"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    # First show active connections summary
+    echo -e "\n${YELLOW}🌟 𝘼𝙘𝙩𝙞𝙫𝙚 𝙐𝙨𝙚𝙧𝙨 𝙎𝙪𝙢𝙢𝙖𝙧𝙮:${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    printf "%-15s %-15s %-15s %-15s\n" "Username" "SSH/SSL" "Dropbear" "Total"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
     while IFS=: read -r type username _ expiry; do
         if [[ "$type" == "ssh" ]]; then
-            # Get all connections for this user
-            echo -e "\n${GREEN}User: $username${NC}"
-            echo -e "Expiry: $expiry"
-            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
-                echo -e "Status: ${GREEN}Active${NC}"
-            else
-                echo -e "Status: ${RED}Expired${NC}"
-            fi
-            
-            echo -e "\nActive Connections:"
-            echo -e "------------------------------------------------"
-            
-            # Check SSH connections
-            echo -e "${YELLOW}SSH/SSL Connections:${NC}"
-            netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | \
-            while read line; do
-                ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
-                port=$(echo $line | awk '{print $5}' | cut -d: -f2)
-                if ps aux | grep -v grep | grep sshd | grep -w "$username" | grep -q "$ip"; then
-                    pid=$(ps aux | grep -v grep | grep sshd | grep -w "$username" | grep "$ip" | awk '{print $2}')
-                    login_time=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
-                    echo -e "├─ IP: $ip"
-                    echo -e "│  ├─ Port: $port"
-                    echo -e "│  └─ Connected: $login_time"
-                fi
-            done
-            
-            # Check Dropbear connections
-            echo -e "\n${YELLOW}Dropbear Connections:${NC}"
-            netstat -natp | grep 'ESTABLISHED.*dropbear' | \
-            while read line; do
-                ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
-                port=$(echo $line | awk '{print $5}' | cut -d: -f2)
-                if ps aux | grep -v grep | grep dropbear | grep -w "$username" | grep -q "$ip"; then
-                    pid=$(ps aux | grep -v grep | grep dropbear | grep -w "$username" | grep "$ip" | awk '{print $2}')
-                    login_time=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
-                    echo -e "├─ IP: $ip"
-                    echo -e "│  ├─ Port: $port"
-                    echo -e "│  └─ Connected: $login_time"
-                fi
-            done
-            
-            # Check OpenVPN connections
-            if [ -f "/etc/openvpn/openvpn-status.log" ]; then
-                echo -e "\n${YELLOW}OpenVPN Connections:${NC}"
-                grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | grep -w "$username" | \
-                while read line; do
-                    ip=$(echo $line | awk '{print $3}' | cut -d: -f1)
-                    connected_since=$(echo $line | awk '{print $5,$6}')
-                    echo -e "├─ IP: $ip"
-                    echo -e "│  └─ Connected Since: $connected_since"
-                done
-            fi
-            
-            # Get total connections
-            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd' | grep -w "$username" | wc -l)
-            ssl_count=$(netstat -natp | grep 'ESTABLISHED.*stunnel' | grep -w "$username" | wc -l)
+            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | wc -l)
             db_count=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | wc -l)
-            ovpn_count=0
-            if [ -f "/etc/openvpn/openvpn-status.log" ]; then
-                ovpn_count=$(grep "CLIENT_LIST" /etc/openvpn/openvpn-status.log | grep -w "$username" | wc -l)
-            fi
-            total_conn=$((ssh_count + ssl_count + db_count + ovpn_count))
+            total=$((ssh_count + db_count))
             
-            echo -e "\n${YELLOW}Connection Summary:${NC}"
-            echo -e "├─ SSH/SSL: $ssh_count"
-            echo -e "├─ Dropbear: $db_count"
-            echo -e "├─ OpenVPN: $ovpn_count"
-            echo -e "└─ Total: $total_conn"
-            echo -e "${GREEN}------------------------------------------------${NC}"
+            if [ $total -gt 0 ]; then
+                printf "%-15s %-15s %-15s %-15s\n" "$username" "$ssh_count" "$db_count" "$total"
+            fi
         fi
     done < $USER_DB
     
+    # Then show detailed connection information for users with active connections
+    echo -e "\n${YELLOW}📊 𝘿𝙚𝙩𝙖𝙞𝙡𝙚𝙙 𝘾𝙤𝙣𝙣𝙚𝙘𝙩𝙞𝙤𝙣 𝙄𝙣𝙛𝙤:${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    while IFS=: read -r type username _ expiry; do
+        if [[ "$type" == "ssh" ]]; then
+            ssh_count=$(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | wc -l)
+            db_count=$(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | wc -l)
+            total=$((ssh_count + db_count))
+            
+            if [ $total -gt 0 ]; then
+                echo -e "\n${GREEN}👤 User: $username${NC}"
+                echo -e "📅 Expiry: $expiry"
+                if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                    echo -e "📊 Status: ${GREEN}Active${NC}"
+                else
+                    echo -e "📊 Status: ${RED}Expired${NC}"
+                fi
+                
+                # Show SSH/SSL connections
+                if [ $ssh_count -gt 0 ]; then
+                    echo -e "\n${YELLOW}🔒 SSH/SSL Connections:${NC}"
+                    netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | \
+                    while read line; do
+                        ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
+                        port=$(echo $line | awk '{print $5}' | cut -d: -f2)
+                        pid=$(echo $line | awk '{print $7}' | cut -d/ -f1)
+                        duration=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
+                        echo -e "   ⚡ IP: $ip"
+                        echo -e "      Port: $port"
+                        echo -e "      Duration: $duration"
+                    done
+                fi
+                
+                # Show Dropbear connections
+                if [ $db_count -gt 0 ]; then
+                    echo -e "\n${YELLOW}🔑 Dropbear Connections:${NC}"
+                    netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | \
+                    while read line; do
+                        ip=$(echo $line | awk '{print $5}' | cut -d: -f1)
+                        port=$(echo $line | awk '{print $5}' | cut -d: -f2)
+                        pid=$(echo $line | awk '{print $7}' | cut -d/ -f1)
+                        duration=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
+                        echo -e "   ⚡ IP: $ip"
+                        echo -e "      Port: $port"
+                        echo -e "      Duration: $duration"
+                    done
+                fi
+                
+                echo -e "\n${YELLOW}📈 Connection Summary:${NC}"
+                echo -e "   • SSH/SSL: $ssh_count"
+                echo -e "   • Dropbear: $db_count"
+                echo -e "   • Total: $total"
+                echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            fi
+        fi
+    done < $USER_DB
+
+    echo -e "\n${YELLOW}💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩 𝙂𝙧𝙤𝙪𝙥: @faizvpn${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     read -n 1 -s -r -p "Press any key to continue"
 }
 
