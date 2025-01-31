@@ -40,20 +40,30 @@ create_account() {
     # Add to database
     echo "ssh:${username}:${password}:${exp_date}" >> $USER_DB
 
-    # Get server IP
+    # Get server IP and domain
     server_ip=$(curl -s ipv4.icanhazip.com)
+    domain=$(cat /etc/vps/domain.conf 2>/dev/null || echo "Not Set")
 
-    # Send success message with connection details
-    message="✅ Account Created Successfully\n\n"
-    message+="📝 Account Details:\n"
-    message+="Username: $username\n"
-    message+="Password: $password\n"
-    message+="Expired Date: $exp_date\n\n"
-    message+="🌐 Connection Details:\n"
-    message+="SSH Port: 22, 109, 143\n"
-    message+="SSL/TLS Port: 443, 445, 777\n"
-    message+="Squid Proxy: 3128, 8080\n"
-    message+="Server IP: $server_ip\n"
+    # Format the success message
+    message="━━━━━━━━━━━━━━━━━━━━━\n"
+    message+="       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙈𝘼𝙉𝘼𝙂𝙀𝙍\n"
+    message+="     ━━━━━━━━━━━━━━━━━━━━━\n\n"
+    message+="✅ 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 𝘾𝙧𝙚𝙖𝙩𝙚𝙙 𝙎𝙪𝙘𝙘𝙚𝙨𝙨𝙛𝙪𝙡𝙡𝙮!\n\n"
+    message+="👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username\n"
+    message+="🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password\n"
+    message+="⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: $duration days\n"
+    message+="📅 𝙀𝙭𝙥𝙞𝙧𝙮: $exp_date\n\n"
+    message+="🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:\n"
+    message+="📍 𝙄𝙋: $server_ip\n"
+    message+="🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $domain\n\n"
+    message+="🔰 𝙐𝘿𝙋 𝘾𝙪𝙨𝙩𝙤𝙢: $server_ip:1-65535@$username:$password\n\n"
+    message+="💎 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨:\n"
+    message+="• SSL/TLS : 443\n"
+    message+="• Websocket SSL : 443\n"
+    message+="• Websocket HTTP : 80\n"
+    message+="• UDP Custom : 1-65535\n\n"
+    message+=" 💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn\n"
+    message+="━━━━━━━━━━━━━━━━━━━━━"
     
     send_message "$chat_id" "$message"
 }
@@ -172,18 +182,41 @@ handle_conversation() {
     local message=$2
     local state=${USER_STATES[$chat_id]}
 
+    # Ignore commands during conversation
+    if [[ "$message" == /* ]]; then
+        send_message "$chat_id" "❌ Please complete the current process first or type 'cancel' to abort"
+        return
+    fi
+
+    # Allow canceling the process
+    if [[ "${message,,}" == "cancel" ]]; then
+        unset USER_STATES[$chat_id]
+        unset TEMP_DATA["${chat_id}_username"]
+        unset TEMP_DATA["${chat_id}_password"]
+        send_message "$chat_id" "✅ Process cancelled"
+        return
+    }
+
     case $state in
         "WAITING_USERNAME")
-            # Save username and ask for password
+            # Validate username
+            if [[ ! $message =~ ^[a-zA-Z0-9_]+$ ]]; then
+                send_message "$chat_id" "❌ Invalid username. Use only letters, numbers and underscore"
+                return
+            fi
             TEMP_DATA["${chat_id}_username"]=$message
             USER_STATES[$chat_id]="WAITING_PASSWORD"
             send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙋𝙖𝙨𝙨 :"
             ;;
         "WAITING_PASSWORD")
-            # Save password and ask for duration
+            # Validate password
+            if [[ ${#message} -lt 6 ]]; then
+                send_message "$chat_id" "❌ Password must be at least 6 characters"
+                return
+            fi
             TEMP_DATA["${chat_id}_password"]=$message
             USER_STATES[$chat_id]="WAITING_DURATION"
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝘿𝙖𝙮𝙨 (1-30):"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣 (𝘿𝙖𝙮𝙨) :"
             ;;
         "WAITING_DURATION")
             # Validate duration
