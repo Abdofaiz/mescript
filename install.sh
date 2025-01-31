@@ -19,108 +19,126 @@ if [ "$(id -u)" != "0" ]; then
    exit 1
 fi
 
-# Detect OS
-OS=$(lsb_release -si)
-VERSION=$(lsb_release -sr)
-echo -e "Detected OS: ${YELLOW}$OS $VERSION${NC}"
+# Function to detect OS
+detect_os() {
+    source /etc/os-release
+    OS=$ID
+    VERSION_ID=$VERSION_ID
+    echo -e "${GREEN}Detected OS: $OS $VERSION_ID${NC}"
+}
 
-# Remove conflicting packages first
-apt remove -y ufw iptables-persistent netfilter-persistent
-
-# Install base packages without conflicts
-echo -e "${YELLOW}Installing base packages...${NC}"
-DEBIAN_FRONTEND=noninteractive apt install -y \
-    cron \
-    iptables \
-    ca-certificates \
-    lsb-release \
-    openssl \
-    stunnel4 \
-    dropbear \
-    squid
-
-# Create service files for Ubuntu 24.04
-cat > /etc/systemd/system/stunnel4.service << 'EOF'
-[Unit]
-Description=SSL tunnel for network daemons
-After=network.target
-After=syslog.target
-
-[Service]
-ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
-Type=forking
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-cat > /etc/systemd/system/dropbear.service << 'EOF'
-[Unit]
-Description=Dropbear SSH Server
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/sbin/dropbear -F -p 22
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Add this before enabling services:
-systemctl daemon-reload
-
-# Modify the service enabling section:
-echo -e "${YELLOW}Enabling and starting services...${NC}"
-for service in stunnel4 dropbear squid xray; do
-    if [ -f "/etc/systemd/system/$service.service" ] || [ -f "/lib/systemd/system/$service.service" ]; then
-        systemctl enable $service
-        systemctl restart $service
-    else
-        echo -e "${RED}Warning: $service.service not found${NC}"
+# Function to update repositories based on OS version
+update_repositories() {
+    if [[ $OS == "ubuntu" ]]; then
+        # Add required repositories for Ubuntu
+        apt-get install -y software-properties-common
+        add-apt-repository -y ppa:ondrej/nginx
+        add-apt-repository -y ppa:ondrej/php
+        
+        # Update package list
+        apt-get update
+    elif [[ $OS == "debian" ]]; then
+        # Add required repositories for Debian
+        apt-get install -y curl gnupg2 ca-certificates lsb-release debian-archive-keyring
+        curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor > /usr/share/keyrings/nginx-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/debian $(lsb_release -cs) nginx" > /etc/apt/sources.list.d/nginx.list
+        
+        # Update package list
+        apt-get update
     fi
-done
+}
 
-# Temporarily disable UFW
-ufw disable
+# Function to install required packages
+install_packages() {
+    echo -e "${GREEN}Installing required packages...${NC}"
+    apt-get install -y \
+        curl \
+        wget \
+        jq \
+        uuid-runtime \
+        cron \
+        iptables \
+        iptables-persistent \
+        net-tools \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+        openssl \
+        nginx \
+        python3 \
+        python3-pip \
+        python3-certbot-nginx \
+        stunnel4 \
+        dropbear \
+        squid \
+        openvpn \
+        easy-rsa \
+        fail2ban \
+        vnstat \
+        ufw \
+        build-essential \
+        make \
+        cmake \
+        gcc \
+        g++ \
+        unzip
+}
 
-# Install Xray
-echo -e "${YELLOW}Installing Xray...${NC}"
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
+# Function to install Xray
+install_xray() {
+    echo -e "${GREEN}Installing Xray...${NC}"
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+}
 
-# Create required directories
-mkdir -p /etc/stunnel
-mkdir -p /etc/squid
-mkdir -p /etc/xray
-
-# Generate Stunnel certificate
-echo -e "${YELLOW}Generating Stunnel certificate...${NC}"
-openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 \
-    -keyout /etc/stunnel/stunnel.key \
-    -out /etc/stunnel/stunnel.pem \
-    -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=FAIZ-VPN"
-cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.pem > /etc/stunnel/stunnel.pem
-
-# Configure Stunnel
-cat > /etc/stunnel/stunnel.conf << EOF
-pid = /var/run/stunnel4.pid
+# Function to configure services
+configure_services() {
+    echo -e "${GREEN}Configuring services...${NC}"
+    
+    # Create necessary directories
+    mkdir -p /etc/vps
+    mkdir -p /etc/openvpn/easy-rsa
+    mkdir -p /etc/openvpn/client-configs
+    mkdir -p /usr/local/etc/xray
+    
+    # Configure Stunnel
+    cat > /etc/stunnel/stunnel.conf <<EOF
+pid = /var/run/stunnel.pid
 cert = /etc/stunnel/stunnel.pem
 client = no
+socket = a:SO_REUSEADDR=1
 socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
 
 [dropbear]
-accept = 447
-connect = 127.0.0.1:143
+accept = 443
+connect = 127.0.0.1:22
 
-[openvpn]
-accept = 587
-connect = 127.0.0.1:1194
+[dropbear]
+accept = 445
+connect = 127.0.0.1:22
+
+[dropbear]
+accept = 777
+connect = 127.0.0.1:22
 EOF
 
-# Configure Squid
-cat > /etc/squid/squid.conf << EOF
+    # Generate SSL certificate
+    openssl genrsa -out /etc/stunnel/stunnel.key 2048
+    openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=Organization/OU=Unit/CN=domain.com"
+    openssl x509 -req -days 365 -in /etc/stunnel/stunnel.csr -signkey /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt
+    cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
+
+    # Configure Dropbear
+    sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
+    sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=443/g' /etc/default/dropbear
+    echo "DROPBEAR_EXTRA_ARGS=\"-p 109 -p 143\"" >> /etc/default/dropbear
+
+    # Configure Squid
+    cat > /etc/squid/squid.conf <<EOF
+http_port 3128
+http_port 8080
+acl localhost src 127.0.0.1/32
+acl to_localhost dst 127.0.0.0/8
 acl SSL_ports port 443
 acl Safe_ports port 80
 acl Safe_ports port 21
@@ -133,220 +151,176 @@ acl Safe_ports port 488
 acl Safe_ports port 591
 acl Safe_ports port 777
 acl CONNECT method CONNECT
+http_access allow localhost
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
 http_access allow all
-http_port 8080
-coredump_dir /var/spool/squid
-refresh_pattern ^ftp: 1440 20% 10080
-refresh_pattern ^gopher: 1440 0% 1440
-refresh_pattern -i (/cgi-bin/|\?) 0 0% 0
-refresh_pattern . 0 20% 4320
-visible_hostname FAIZ-VPN
 EOF
 
-# Configure firewall
-echo -e "${YELLOW}Configuring firewall...${NC}"
+    # Configure UFW
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw allow 22/tcp
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    ufw allow 3128/tcp
+    ufw allow 8080/tcp
+    ufw allow 1194/tcp
+    ufw allow 1194/udp
+    echo "y" | ufw enable
 
-# Clear existing rules
-iptables -F
-iptables -X
-iptables -t nat -F
-iptables -t nat -X
-iptables -t mangle -F
-iptables -t mangle -X
+    # Configure WebSocket Service
+    cat > /usr/local/bin/ws-ssh.py <<'EOF'
+#!/usr/bin/env python3
+import socket
+import threading
+import select
+import sys
+import time
+import getopt
 
-# Default policy
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT ACCEPT
+LISTENING_ADDR = '0.0.0.0'
+LISTENING_PORT = 80
+PASS = ''
 
-# Allow loopback
-iptables -A INPUT -i lo -j ACCEPT
-iptables -A OUTPUT -o lo -j ACCEPT
+BUFLEN = 4096 * 4
+TIMEOUT = 60
+DEFAULT_HOST = '127.0.0.1:22'
+RESPONSE = 'HTTP/1.1 101 WebSocket Protocol Handshake\r\n\r\n'
 
-# Allow established connections
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+class Server(threading.Thread):
+    def __init__(self, host, port):
+        threading.Thread.__init__(self)
+        self.running = False
+        self.host = host
+        self.port = port
+        self.threads = []
+        self.threadsLock = threading.Lock()
+        self.logLock = threading.Lock()
 
-# Allow SSH (port 22)
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+    def run(self):
+        self.soc = socket.socket(socket.AF_INET)
+        self.soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.soc.settimeout(2)
+        self.soc.bind((self.host, self.port))
+        self.soc.listen(0)
+        self.running = True
 
-# Allow HTTP (port 80)
-iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+        try:
+            while self.running:
+                try:
+                    c, addr = self.soc.accept()
+                    c.setblocking(1)
+                    conn = ConnectionHandler(c, self, addr)
+                    conn.start()
+                    self.addConn(conn)
+                except socket.timeout:
+                    continue
+        except Exception as e:
+            print('Exception:', e)
 
-# Allow HTTPS (port 443)
-iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+        self.running = False
+        self.soc.close()
 
-# Allow Squid (port 8080)
-iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+    def addConn(self, conn):
+        try:
+            self.threadsLock.acquire()
+            if self.running:
+                self.threads.append(conn)
+        finally:
+            self.threadsLock.release()
 
-# Allow Xray (ports 8442, 8443)
-iptables -A INPUT -p tcp --dport 8442 -j ACCEPT
-iptables -A INPUT -p tcp --dport 8443 -j ACCEPT
+    def removeConn(self, conn):
+        try:
+            self.threadsLock.acquire()
+            self.threads.remove(conn)
+        finally:
+            self.threadsLock.release()
 
-# Save iptables rules
-mkdir -p /etc/iptables
-iptables-save > /etc/iptables/rules.v4
+def main():
+    print('Starting WebSocket Server...')
+    server = Server(LISTENING_ADDR, LISTENING_PORT)
+    server.start()
+    while True:
+        try:
+            time.sleep(2)
+        except KeyboardInterrupt:
+            print('Stopping...')
+            server.running = False
+            server.join()
+            break
 
-# Create service to load iptables rules on boot
-cat > /etc/systemd/system/iptables-restore.service << 'EOF'
-[Unit]
-Description=Restore iptables rules
-Before=network-pre.target
-
-[Service]
-Type=oneshot
-ExecStart=/sbin/iptables-restore /etc/iptables/rules.v4
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
+if __name__ == '__main__':
+    main()
 EOF
 
-# Enable iptables-restore service
-systemctl daemon-reload
-systemctl enable iptables-restore
+    chmod +x /usr/local/bin/ws-ssh.py
 
-# Install menu script properly
-echo -e "${YELLOW}Installing menu script...${NC}"
-
-# Create menu directory
-mkdir -p /usr/local/bin/menu
-
-# Download menu components
-wget -O /usr/local/bin/menu/menu.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/menu.sh"
-wget -O /usr/local/bin/menu/ssh.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/ssh.sh"
-wget -O /usr/local/bin/menu/system.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/system.sh"
-wget -O /usr/local/bin/menu/vless.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/vless.sh"
-wget -O /usr/local/bin/menu/vmess.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/vmess.sh"
-
-# Make scripts executable
-chmod +x /usr/local/bin/menu/*.sh
-
-# Create main menu command
-cat > /usr/bin/menu << 'EOF'
-#!/bin/bash
-/usr/local/bin/menu/menu.sh
-EOF
-
-# Make menu command executable
-chmod +x /usr/bin/menu
-
-# Create aliases for quick access
-cat > /root/.bash_aliases << 'EOF'
-alias m="menu"
-alias menu="menu"
-EOF
-
-# Load new aliases
-source /root/.bash_aliases
-
-echo -e "${GREEN}Menu installation completed!${NC}"
-
-# Create VPS info directory if it doesn't exist
-mkdir -p /etc/vps
-
-# Save installation date
-echo "Installation Date: $(date '+%Y-%m-%d')" > /etc/vps/install-date
-
-# Final setup
-echo -e "${GREEN}Installation completed!${NC}"
-echo -e "${YELLOW}Type 'menu' to access the control panel${NC}"
-
-# Add these service installations and configurations after the initial package installation:
-
-# Install Nginx
-apt install -y nginx
-systemctl enable nginx
-systemctl start nginx
-
-# Configure Dropbear
-cat > /etc/default/dropbear << 'EOF'
-NO_START=0
-DROPBEAR_PORT=143
-DROPBEAR_EXTRA_ARGS="-p 50000"
-DROPBEAR_BANNER="/etc/issue.net"
-DROPBEAR_RECEIVE_WINDOW=65536
-EOF
-
-# Install BadVPN
-wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/Abdofaiz/mescript/main/badvpn-udpgw64"
-chmod +x /usr/bin/badvpn-udpgw
-
-# Create BadVPN service
-cat > /etc/systemd/system/badvpn.service << 'EOF'
-[Unit]
-Description=BadVPN UDP Gateway
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/badvpn-udpgw --listen-addr 127.0.0.1:7300
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Configure WebSocket
-cat > /etc/nginx/conf.d/ws.conf << 'EOF'
-server {
-    listen 80;
-    server_name 127.0.0.1;
-    
-    location / {
-        proxy_pass http://127.0.0.1:700;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-    }
-}
-EOF
-
-# Create WebSocket service
-cat > /etc/systemd/system/ws-ssh.service << 'EOF'
+    # Create WebSocket service
+    cat > /etc/systemd/system/ws-ssh.service <<EOF
 [Unit]
 Description=WebSocket SSH Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -m websockify --web=/usr/share/websockify 700 127.0.0.1:143
+User=root
+ExecStart=/usr/bin/python3 /usr/local/bin/ws-ssh.py
 Restart=always
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Install WebSocket dependencies
-apt install -y python3-websockify
+    systemctl daemon-reload
+    systemctl enable ws-ssh
+    systemctl start ws-ssh
+}
 
-# Enable and start all services
-systemctl daemon-reload
+# Function to install menu script
+install_menu() {
+    echo -e "${GREEN}Installing menu script...${NC}"
+    wget -O /usr/local/bin/menu.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/menu.sh"
+    chmod +x /usr/local/bin/menu.sh
+    
+    # Create menu command
+    echo '#!/bin/bash' > /usr/bin/menu
+    echo 'bash /usr/local/bin/menu.sh' >> /usr/bin/menu
+    chmod +x /usr/bin/menu
+}
 
-services=(
-    "nginx"
-    "dropbear"
-    "stunnel4"
-    "badvpn"
-    "ws-ssh"
-    "xray"
-    "squid"
-)
+# Main installation
+main_install() {
+    detect_os
+    update_repositories
+    install_packages
+    install_xray
+    configure_services
+    install_menu
+    
+    # Start and enable services
+    systemctl daemon-reload
+    systemctl enable stunnel4
+    systemctl enable dropbear
+    systemctl enable squid
+    systemctl enable xray
+    
+    systemctl restart stunnel4
+    systemctl restart dropbear
+    systemctl restart squid
+    systemctl restart xray
+    
+    # Create VPS info directory if it doesn't exist
+    mkdir -p /etc/vps
 
-for service in "${services[@]}"; do
-    echo "Starting $service..."
-    systemctl enable $service
-    systemctl restart $service
-    sleep 1
-done
+    # Save installation date
+    echo "Installation Date: $(date '+%Y-%m-%d')" > /etc/vps/install-date
+    
+    # Final setup
+    echo -e "${GREEN}Installation completed!${NC}"
+    echo -e "${YELLOW}Type 'menu' to access the control panel${NC}"
+}
 
-# Verify services are running
-echo "Checking service status..."
-for service in "${services[@]}"; do
-    if systemctl is-active --quiet $service; then
-        echo "$service is running"
-    else
-        echo "$service failed to start"
-        systemctl status $service
-    fi
-done 
+# Start installation
+main_install 
