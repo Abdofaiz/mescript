@@ -17,6 +17,11 @@ add_user() {
     local password=$3
     local duration=$4
     
+    if [[ -z "$username" || -z "$password" || -z "$duration" ]]; then
+        send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
+        return 1
+    }
+    
     # Add user using your existing script
     useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
@@ -66,19 +71,28 @@ process_message() {
     
     case $message in
         "/start")
-            send_message "$chat_id" "Welcome to FAIZ-VPN Management Bot!\n\nCommands:\n/adduser - Add new user\n/removeuser - Remove user\n/status - Check user status\n/server - Server status"
+            send_message "$chat_id" "Welcome to FAIZ-VPN Management Bot!\n\nAvailable Commands:\n\n/adduser <username> <password> <duration> - Add new user\n/removeuser <username> - Remove user\n/status <username> - Check user status\n/server - Check server status"
+            ;;
+        "/adduser")
+            send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
             ;;
         "/adduser "*)
             local params=(${message#"/adduser "})
             if [[ ${#params[@]} == 3 ]]; then
                 add_user "$chat_id" "${params[0]}" "${params[1]}" "${params[2]}"
             else
-                send_message "$chat_id" "❌ Usage: /adduser username password duration"
+                send_message "$chat_id" "❌ Usage: /adduser <username> <password> <duration>\n\nExample: /adduser john pass123 30"
             fi
+            ;;
+        "/removeuser")
+            send_message "$chat_id" "❌ Usage: /removeuser <username>\n\nExample: /removeuser john"
             ;;
         "/removeuser "*)
             local username=${message#"/removeuser "}
             remove_user "$chat_id" "$username"
+            ;;
+        "/status")
+            send_message "$chat_id" "❌ Usage: /status <username>\n\nExample: /status john"
             ;;
         "/status "*)
             local username=${message#"/status "}
@@ -88,7 +102,7 @@ process_message() {
             server_status "$chat_id"
             ;;
         *)
-            send_message "$chat_id" "❌ Unknown command. Use /start to see available commands."
+            send_message "$chat_id" "❌ Unknown command.\n\nAvailable Commands:\n/start - Show all commands\n/adduser - Add new user\n/removeuser - Remove user\n/status - Check user status\n/server - Check server status"
             ;;
     esac
 }
