@@ -1058,6 +1058,8 @@ show_main_menu() {
     
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}                VPS Control Panel                ${NC}"
+    echo -e "${YELLOW}                      FAIZ-VPN                     ${NC}"
+
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}VPS Information${NC}"
     echo -e "${GREEN}- IP VPS        :${NC} $IPVPS"
