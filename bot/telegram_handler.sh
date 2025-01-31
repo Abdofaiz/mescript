@@ -93,7 +93,7 @@ server_status() {
 # Function to show help message
 show_help() {
     local chat_id=$1
-    send_message "$chat_id" "👋 Welcome to VPS Management Bot!\n\n📝 Available Commands:\n\n/adduser - Create new account\nFormat: /adduser username password days\n\n/removeuser - Delete account\nFormat: /removeuser username\n\n/status - Check account status\nFormat: /status username\n\n/server - View server status\n\n💡 Need help? Contact @faizvpn"
+    send_message "$chat_id" "━━━━━━━━━━━━━━━━━━━━━\n       🚀 FAIZ-VPN MANAGER BOT\n━━━━━━━━━━━━━━━━━━━━━\n\n👋 Welcome to FAIZ-VPN Manager!\n\n📝 Available Commands:\n\n/adduser - Create new account\nFormat: /adduser username password days\n\n/removeuser - Delete account\nFormat: /removeuser username\n\n/status - Check account status\nFormat: /status username\n\n/server - View server status\n\n💡 Support: @faizvpn\n━━━━━━━━━━━━━━━━━━━━━"
 }
 
 # Main bot loop
@@ -125,7 +125,7 @@ process_message() {
             server_status "$chat_id"
             ;;
         *)
-            send_message "$chat_id" "❌ Unknown command\n\n📝 Available Commands:\n/start - Show menu\n/adduser - Create account\n/removeuser - Delete account\n/status - Check account\n/server - Server status\n\n💡 Need help? Contact @faizvpn"
+            send_message "$chat_id" "━━━━━━━━━━━━━━━━━━━━━\n       🚀 FAIZ-VPN MANAGER BOT\n━━━━━━━━━━━━━━━━━━━━━\n\n❌ Unknown command\n\n📝 Available Commands:\n/start - Show menu\n/adduser - Create account\n/removeuser - Delete account\n/status - Check account\n/server - Server status\n\n💡 Support: @faizvpn\n━━━━━━━━━━━━━━━━━━━━━"
             ;;
     esac
 }
