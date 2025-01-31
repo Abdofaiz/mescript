@@ -20,7 +20,14 @@ declare -A TEMP_DATA
 # Add these at the start of the file
 LOG_FILE="/var/log/telegram-bot.log"
 
-log_debug() {
+# Load bot token
+source /etc/vps/telegram.conf
+
+# API URL
+API_URL="https://api.telegram.org/bot$BOT_TOKEN"
+
+# Function to log messages
+log_message() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
@@ -176,10 +183,10 @@ check_status() {
 # Function to send message
 send_message() {
     local chat_id=$1
-    local message=$2
-    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+    local text=$2
+    curl -s -X POST "$API_URL/sendMessage" \
         -d chat_id="$chat_id" \
-        -d text="$message" \
+        -d text="$text" \
         -d parse_mode="HTML"
 }
 
@@ -243,134 +250,110 @@ handle_conversation() {
     esac
 }
 
-# Update the handle_command function
+# Function to show menu
+show_menu() {
+    local chat_id=$1
+    local menu_text="⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
+      𝙎𝙀𝙍𝙑𝙀𝙍 𝙋𝙍𝙀𝙈𝙄𝙐𝙈
+
+    👋 𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉
+
+      📝 𝘾𝙊𝙈𝙈𝘼𝙉𝘿 𝙇𝙄𝙎𝙏 :
+
+          ⚡ /create
+     𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
+
+          🌐 /vless
+       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙇𝙀𝙎𝙎 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
+
+          🌐 /vmess
+       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙈𝙚𝙨𝙨 𝘼𝙘𝙘𝙤𝙪𝙣𝙩
+
+          🗑️ /delete
+       𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧
+
+          📊 /status
+       𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨
+
+          🔄 /restart
+      𝙍𝙚𝙨𝙩𝙖𝙧𝙩 𝘼𝙡𝙡 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨
+
+          🔌 /reboot
+        𝙍𝙚𝙗𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧
+
+      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn"
+    
+    send_message "$chat_id" "$menu_text"
+}
+
+# Function to handle commands
 handle_command() {
     local chat_id=$1
     local command=$2
-    local message=$3
     
     # Check if user is in conversation
     if [ -n "${USER_STATES[$chat_id]}" ]; then
-        handle_conversation "$chat_id" "$message"
+        handle_conversation "$chat_id" "$command"
         return
     }
     
     case $command in
-        "/start" | "/help")
-            message="⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡\n"
-            message+="      𝙎𝙀𝙍𝙑𝙀𝙍 𝙋𝙍𝙀𝙈𝙄𝙐𝙈\n\n"
-            message+="    👋 𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉\n\n"
-            message+="      📝 𝘾𝙊𝙈𝙈𝘼𝙉𝘿 𝙇𝙄𝙎𝙏 :\n\n"
-            message+="          ⚡ /create\n"
-            message+="     𝘾𝙧𝙚𝙖𝙩𝙚 𝙉𝙚𝙬 𝘼𝙘𝙘𝙤𝙪𝙣𝙩\n\n"
-            message+="          🌐 /vless\n"
-            message+="       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙇𝙀𝙎𝙎 𝘼𝙘𝙘𝙤𝙪𝙣𝙩\n\n"
-            message+="          🌐 /vmess\n"
-            message+="       𝘾𝙧𝙚𝙖𝙩𝙚 𝙑𝙈𝙚𝙨𝙨 𝘼𝙘𝙘𝙤𝙪𝙣𝙩\n\n"
-            message+="          🗑️ /delete\n"
-            message+="       𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧\n\n"
-            message+="          📊 /status\n"
-            message+="       𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨\n\n"
-            message+="          🔄 /restart\n"
-            message+="      𝙍𝙚𝙨𝙩𝙖𝙧𝙩 𝘼𝙡𝙡 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨\n\n"
-            message+="          🔌 /reboot\n"
-            message+="        𝙍𝙚𝙗𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧\n\n"
-            message+="      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn"
-            send_message "$chat_id" "$message"
-            ;;
-        "/create")
-            USER_STATES[$chat_id]="WAITING_USERNAME"
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
+        "/start")
+            show_menu "$chat_id"
             ;;
         "/vless")
-            if [ ${#args[@]} -eq 0 ]; then
-                message="🌐 Create VLESS Account\n\n"
-                message+="Usage: /vless username days\n\n"
-                message+="Example:\n"
-                message+="/vless test123 30"
-                send_message "$chat_id" "$message"
-                return
-            elif [ ${#args[@]} -ne 2 ]; then
-                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /vless username days\nExample: /vless test123 30"
-                return 1
-            fi
-            create_vless "$chat_id" "${args[0]}" "${args[1]}"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
             ;;
         "/vmess")
-            if [ ${#args[@]} -eq 0 ]; then
-                message="🌐 Create VMess Account\n\n"
-                message+="Usage: /vmess username days\n\n"
-                message+="Example:\n"
-                message+="/vmess test123 30"
-                send_message "$chat_id" "$message"
-                return
-            elif [ ${#args[@]} -ne 2 ]; then
-                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /vmess username days\nExample: /vmess test123 30"
-                return 1
-            fi
-            create_vmess "$chat_id" "${args[0]}" "${args[1]}"
-            ;;
-        "/delete")
-            if [ ${#args[@]} -eq 0 ]; then
-                message="🗑️ Delete User Account\n\n"
-                message+="Usage: /delete username\n\n"
-                message+="Example:\n"
-                message+="/delete test123"
-                send_message "$chat_id" "$message"
-                return
-            elif [ ${#args[@]} -ne 1 ]; then
-                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /delete username\nExample: /delete test123"
-                return 1
-            fi
-            delete_user "$chat_id" "${args[0]}"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
             ;;
         "/status")
             check_status "$chat_id"
             ;;
         "/restart")
-            systemctl restart ssh dropbear stunnel4 xray
-            send_message "$chat_id" "✅ All services have been restarted"
+            send_message "$chat_id" "𝙍𝙚𝙨𝙩𝙖𝙧𝙩𝙞𝙣𝙜 𝙨𝙚𝙧𝙫𝙞𝙘𝙚𝙨..."
             ;;
         "/reboot")
-            send_message "$chat_id" "🔄 Server is rebooting..."
-            reboot
+            send_message "$chat_id" "𝙍𝙚𝙗𝙤𝙤𝙩𝙞𝙣𝙜 𝙨𝙚𝙧𝙫𝙚𝙧..."
             ;;
         *)
-            send_message "$chat_id" "❌ Unknown command. Use /help to see available commands."
+            show_menu "$chat_id"
             ;;
     esac
 }
 
-# Update the main loop with logging
+# Main loop
+offset=0
 while true; do
-    log_debug "Getting updates with offset $offset"
+    # Get updates
     updates=$(curl -s "$API_URL/getUpdates?offset=$offset&timeout=60")
     
-    if ! echo "$updates" | jq -e '.result' >/dev/null 2>&1; then
-        log_debug "Error: Invalid updates response"
-        log_debug "Response: $updates"
-        sleep 5
-        continue
-    fi
-    
-    # Process updates with logging
-    while read -r update; do
-        if [ -n "$update" ]; then
-            log_debug "Processing update: $update"
-            chat_id=$(echo "$update" | jq -r '.message.chat.id')
-            message=$(echo "$update" | jq -r '.message.text')
-            update_id=$(echo "$update" | jq -r '.update_id')
-            
-            log_debug "Chat ID: $chat_id, Message: $message"
-            
-            if [ -n "$message" ] && [ "$message" != "null" ]; then
-                process_message "$chat_id" "$message"
+    # Check for valid response
+    if [ $? -eq 0 ]; then
+        # Process each update
+        while read -r line; do
+            if [ ! -z "$line" ]; then
+                # Extract message data
+                chat_id=$(echo "$line" | jq -r '.message.chat.id')
+                message=$(echo "$line" | jq -r '.message.text')
+                update_id=$(echo "$line" | jq -r '.update_id')
+                
+                # Log received message
+                log_message "Received message: $message from chat_id: $chat_id"
+                
+                # Handle message
+                if [ ! -z "$message" ] && [ "$message" != "null" ]; then
+                    handle_command "$chat_id" "$message"
+                fi
+                
+                # Update offset
+                offset=$((update_id + 1))
             fi
-            
-            offset=$((update_id + 1))
-            log_debug "New offset: $offset"
-        fi
-    done < <(echo "$updates" | jq -c '.result[]')
+        done < <(echo "$updates" | jq -c '.result[]')
+    else
+        log_message "Error getting updates"
+        sleep 5
+    fi
     
     sleep 1
 done
