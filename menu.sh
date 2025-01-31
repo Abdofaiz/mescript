@@ -16,6 +16,9 @@ USER_DB="/etc/vps/users.db"
 # Add after color definitions
 ADMRufu="/etc/ADMRufu"
 
+# Add at the beginning of the script after color definitions
+SCRIPT_URL="https://raw.githubusercontent.com/Abdofaiz/mescript/main"
+
 # Create user database if it doesn't exist
 [ ! -f "$USER_DB" ] && touch "$USER_DB"
 
@@ -1381,6 +1384,59 @@ manage_telegram_bot() {
     manage_telegram_bot
 }
 
+# Function to reinstall script
+reinstall_script() {
+    clear
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "            🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙍𝙀𝙄𝙉𝙎𝙏𝘼𝙇𝙇"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e ""
+    echo -e "${YELLOW}This will reinstall all script components:${NC}"
+    echo -e " • SSH & OpenVPN"
+    echo -e " • Stunnel4"
+    echo -e " • Dropbear"
+    echo -e " • Squid Proxy"
+    echo -e " • BadVPN UDP"
+    echo -e " • Xray"
+    echo -e " • Websocket"
+    echo -e ""
+    echo -e "${RED}Warning: All current settings will be backed up${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    read -p "Do you want to continue? [y/N]: " confirm
+
+    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+        # Backup current configs
+        echo -e "\n${YELLOW}Backing up current configurations...${NC}"
+        mkdir -p /etc/vps/backup
+        cp /etc/vps/*.conf /etc/vps/backup/ 2>/dev/null
+        cp /etc/vps/*.db /etc/vps/backup/ 2>/dev/null
+        
+        # Download and run installer
+        echo -e "\n${YELLOW}Downloading latest installer...${NC}"
+        wget -O install.sh "${SCRIPT_URL}/install.sh"
+        chmod +x install.sh
+        
+        echo -e "\n${YELLOW}Starting reinstallation...${NC}"
+        ./install.sh
+        
+        # Restore configs
+        echo -e "\n${YELLOW}Restoring configurations...${NC}"
+        cp /etc/vps/backup/* /etc/vps/ 2>/dev/null
+        
+        echo -e "\n${GREEN}Reinstallation completed!${NC}"
+        echo -e "Your previous settings have been restored."
+        echo -e "\n${YELLOW}Please reboot your VPS to apply all changes${NC}"
+        read -p "Reboot now? [y/N]: " reboot
+        if [[ "$reboot" == "y" || "$reboot" == "Y" ]]; then
+            reboot
+        fi
+    else
+        echo -e "\n${YELLOW}Reinstallation cancelled${NC}"
+    fi
+    
+    read -n 1 -s -r -p "Press any key to continue"
+}
+
 # Main menu display
 show_main_menu() {
     clear
@@ -1406,7 +1462,8 @@ show_main_menu() {
     echo -e "${GREEN}6.${NC} Service Status"
     echo -e "${GREEN}7.${NC} BadVPN Manager"
     echo -e "${GREEN}8.${NC} Telegram Bot Manager"
-    echo -e "${RED}9.${NC} Uninstall All Services"
+    echo -e "${GREEN}9.${NC} Reinstall VPS Script"
+    echo -e "${RED}10.${NC} Uninstall VPS Script"
     echo -e "${GREEN}0.${NC} Exit"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${GREEN}║            ${YELLOW}Telegram: @faizvpn               ${GREEN}║${NC}"
@@ -1601,6 +1658,9 @@ while true; do
             manage_telegram_bot
             ;;
         9)
+            reinstall_script
+            ;;
+        10)
             echo -e "${RED}Warning: This will uninstall all VPS services${NC}"
             read -p "Are you sure you want to continue? (y/n): " confirm
             if [[ $confirm == "y" || $confirm == "Y" ]]; then
