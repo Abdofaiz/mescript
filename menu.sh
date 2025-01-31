@@ -918,6 +918,34 @@ restart_udp_custom() {
     start_udp_custom
 }
 
+# Function to check service status
+check_service_status() {
+    local service=$1
+    if systemctl is-active --quiet $service; then
+        echo -e "${GREEN}Running${NC}"
+    else
+        echo -e "${RED}Not Running${NC}"
+    fi
+}
+
+# Function to display service statuses
+show_service_status() {
+    clear
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}               Service Status Check              ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}UDP Custom     :${NC} $(check_service_status udp-custom)"
+    echo -e "${YELLOW}Stunnel4       :${NC} $(check_service_status stunnel4)"
+    echo -e "${YELLOW}Dropbear       :${NC} $(check_service_status dropbear)"
+    echo -e "${YELLOW}WebSocket SSH  :${NC} $(check_service_status ws-ssh)"
+    echo -e "${YELLOW}Xray          :${NC} $(check_service_status xray)"
+    echo -e "${YELLOW}Nginx         :${NC} $(check_service_status nginx)"
+    echo -e "${YELLOW}Squid         :${NC} $(check_service_status squid)"
+    echo -e "${GREEN}=================================================${NC}"
+    echo ""
+    read -n 1 -s -r -p "Press any key to return to menu"
+}
+
 # Main menu loop
 while true; do
     clear
@@ -929,7 +957,8 @@ while true; do
     echo -e "${GREEN}3.${NC} UDP Custom Menu"
     echo -e "${GREEN}4.${NC} System Information"
     echo -e "${GREEN}5.${NC} System Settings"
-    echo -e "${RED}6.${NC} Uninstall All Services"
+    echo -e "${GREEN}6.${NC} Service Status"
+    echo -e "${RED}7.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
     echo -e "${GREEN}=================================================${NC}"
     read -p "Select menu: " menu_option
@@ -1108,6 +1137,9 @@ while true; do
             esac
             ;;
         6)
+            show_service_status
+            ;;
+        7)
             echo -e "${RED}Warning: This will uninstall all VPS services${NC}"
             read -p "Are you sure you want to continue? (y/n): " confirm
             if [[ $confirm == "y" || $confirm == "Y" ]]; then
