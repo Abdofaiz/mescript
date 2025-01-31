@@ -141,15 +141,65 @@ EOF
 
 # Configure firewall
 echo -e "${YELLOW}Configuring firewall...${NC}"
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 8080/tcp
-ufw allow 8442/tcp
-ufw allow 8443/tcp
-echo "y" | ufw enable
+
+# Clear existing rules
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+iptables -t mangle -F
+iptables -t mangle -X
+
+# Default policy
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+# Allow loopback
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# Allow established connections
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Allow SSH (port 22)
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+# Allow HTTP (port 80)
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+
+# Allow HTTPS (port 443)
+iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+
+# Allow Squid (port 8080)
+iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+
+# Allow Xray (ports 8442, 8443)
+iptables -A INPUT -p tcp --dport 8442 -j ACCEPT
+iptables -A INPUT -p tcp --dport 8443 -j ACCEPT
+
+# Save iptables rules
+mkdir -p /etc/iptables
+iptables-save > /etc/iptables/rules.v4
+
+# Create service to load iptables rules on boot
+cat > /etc/systemd/system/iptables-restore.service << 'EOF'
+[Unit]
+Description=Restore iptables rules
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/iptables-restore /etc/iptables/rules.v4
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable iptables-restore service
+systemctl daemon-reload
+systemctl enable iptables-restore
 
 # Install menu script
 echo -e "${YELLOW}Installing menu script...${NC}"
