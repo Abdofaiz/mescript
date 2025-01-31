@@ -26,9 +26,10 @@ create_user() {
     local chat_id=$1
     local username=$2
     local password=$3
+    local duration=$4
     
     # Add user
-    useradd -e $(date -d "+30 days" +"%Y-%m-%d") -s /bin/false -M $username
+    useradd -e $(date -d "+$duration days" +"%Y-%m-%d") -s /bin/false -M $username
     echo "$username:$password" | chpasswd
     
     send_message "$chat_id" "\
@@ -40,12 +41,12 @@ create_user() {
 
 👤 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚: $username
 🔑 𝙋𝙖𝙨𝙨𝙬𝙤𝙧𝙙: $password
-⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: 30 days
+⏱ 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣: $duration days
 
 🌐 𝙎𝙚𝙧𝙫𝙚𝙧 𝘿𝙚𝙩𝙖𝙞𝙡𝙨:
 📍 𝙄𝙋: $(curl -s ipv4.icanhazip.com)
 🔗 𝘿𝙤𝙢𝙖𝙞𝙣: $(cat /etc/vps/domain.conf 2>/dev/null || echo 'Not Set')
-📅 𝙀𝙭𝙥𝙞𝙧𝙮: $(date -d "+30 days" +"%Y-%m-%d")
+📅 𝙀𝙭𝙥𝙞𝙧𝙮: $(date -d "+$duration days" +"%Y-%m-%d")
 
 💡 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
 ━━━━━━━━━━━━━━━━━━━━━"
@@ -166,10 +167,17 @@ process_message() {
             send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙋𝙖𝙨𝙨 :"
             ;;
         "waiting_password")
+            user_data[$chat_id,password]=$message
+            user_states[$chat_id]="waiting_duration"
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣 (𝘿𝙖𝙮𝙨) :"
+            ;;
+        "waiting_duration")
             local username=${user_data[$chat_id,username]}
-            create_user "$chat_id" "$username" "$message"
+            local password=${user_data[$chat_id,password]}
+            create_user "$chat_id" "$username" "$password" "$message"
             user_states[$chat_id]="none"
             unset user_data[$chat_id,username]
+            unset user_data[$chat_id,password]
             ;;
     esac
 }
