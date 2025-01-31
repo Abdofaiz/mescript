@@ -202,6 +202,9 @@ show_welcome() {
           🗑️ /delete
        𝙍𝙚𝙢𝙤𝙫𝙚 𝙐𝙨𝙚𝙧
 
+          📊 /status
+       𝙎𝙚𝙧𝙫𝙚𝙧 𝙎𝙩𝙖𝙩𝙪𝙨
+
           🔄 /restart
       𝙍𝙚𝙨𝙩𝙖𝙧𝙩 𝘼𝙡𝙡 𝙎𝙚𝙧𝙫𝙞𝙘𝙚𝙨
 
@@ -306,7 +309,7 @@ reboot_server() {
     
     send_message "$chat_id" "$(cat << 'EOF'
 
-       ⚡ 𝙁��𝙄𝙕-��𝙋�� ⚡
+       ⚡ 𝙁��𝙄𝙕-��𝙋𝙉 ⚡
 
     🔌 𝙍𝙚��𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧...
     
@@ -350,8 +353,54 @@ delete_user() {
 EOF
 )"
     else
-        send_message "$chat_id" "❌ 𝙐𝙨𝙚𝙧 $username 𝙙𝙤𝙚𝙨 𝙣𝙤𝙩 𝙚��𝙞𝙨𝙩"
+        send_message "$chat_id" "❌ 𝙐𝙨𝙚𝙧 $username 𝙙𝙤𝙚𝙨 𝙣𝙤𝙩 𝙚��𝙩"
     fi
+}
+
+# Add new function to check server status
+check_server_status() {
+    local chat_id=$1
+    
+    # Get system info
+    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
+    local memory_info=$(free -m | grep Mem)
+    local memory_total=$(echo $memory_info | awk '{print $2}')
+    local memory_used=$(echo $memory_info | awk '{print $3}')
+    local memory_usage=$((memory_used * 100 / memory_total))
+    local disk_usage=$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)
+    local uptime=$(uptime -p)
+    
+    # Check service status
+    local ssh_status=$(systemctl is-active ssh)
+    local dropbear_status=$(systemctl is-active dropbear)
+    local stunnel_status=$(systemctl is-active stunnel4)
+    local openvpn_status=$(systemctl is-active openvpn)
+    local trojan_status=$(systemctl is-active trojan)
+    local shadowsocks_status=$(systemctl is-active shadowsocks-libev)
+    
+    send_message "$chat_id" "$(cat << EOF
+     ━━━━━━━━━━━━━━━━━━━━━
+       🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙎𝙏𝘼𝙏𝙐𝙎
+     ━━━━━━━━━━━━━━━━━━━━━
+
+💻 𝙎𝙮𝙨𝙩𝙚𝙢 𝙄𝙣𝙛𝙤:
+ • CPU: $cpu_usage%
+ • RAM: $memory_usage%
+ • Disk: $disk_usage%
+ • Uptime: $uptime
+
+📊 𝙎𝙚𝙧𝙫𝙞𝙘𝙚 𝙎𝙩𝙖𝙩𝙪𝙨:
+ • SSH: ${ssh_status^^}
+ • Dropbear: ${dropbear_status^^}
+ • Stunnel: ${stunnel_status^^}
+ • OpenVPN: ${openvpn_status^^}
+ • Trojan: ${trojan_status^^}
+ • Shadowsocks: ${shadowsocks_status^^}
+
+      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
+━━━━━━━━━━━━━━━━━━━━━
+EOF
+)"
 }
 
 # Process messages
@@ -373,7 +422,7 @@ process_message() {
                     send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
                     ;;
                 "/status")
-                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝘾𝙝𝙚𝙘𝙠:"
+                    check_server_status "$chat_id"
                     ;;
                 "/server")
                     server_status "$chat_id"
