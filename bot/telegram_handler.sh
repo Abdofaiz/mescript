@@ -192,29 +192,61 @@ handle_command() {
             send_message "$chat_id" "$message"
             ;;
         "/create")
-            if [ ${#args[@]} -ne 3 ]; then
-                send_message "$chat_id" "Usage: /create username password duration"
+            if [ ${#args[@]} -eq 0 ]; then
+                message="📝 Create New Account\n\n"
+                message+="Usage: /create username password days\n\n"
+                message+="Example:\n"
+                message+="/create test123 pass123 30\n\n"
+                message+="This will create:\n"
+                message+="• Username: test123\n"
+                message+="• Password: pass123\n"
+                message+="• Duration: 30 days"
+                send_message "$chat_id" "$message"
+                return
+            elif [ ${#args[@]} -ne 3 ]; then
+                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /create username password days\nExample: /create test123 pass123 30"
                 return 1
             fi
             create_account "$chat_id" "${args[0]}" "${args[1]}" "${args[2]}"
             ;;
         "/vless")
-            if [ ${#args[@]} -ne 2 ]; then
-                send_message "$chat_id" "Usage: /vless username duration"
+            if [ ${#args[@]} -eq 0 ]; then
+                message="🌐 Create VLESS Account\n\n"
+                message+="Usage: /vless username days\n\n"
+                message+="Example:\n"
+                message+="/vless test123 30"
+                send_message "$chat_id" "$message"
+                return
+            elif [ ${#args[@]} -ne 2 ]; then
+                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /vless username days\nExample: /vless test123 30"
                 return 1
             fi
             create_vless "$chat_id" "${args[0]}" "${args[1]}"
             ;;
         "/vmess")
-            if [ ${#args[@]} -ne 2 ]; then
-                send_message "$chat_id" "Usage: /vmess username duration"
+            if [ ${#args[@]} -eq 0 ]; then
+                message="🌐 Create VMess Account\n\n"
+                message+="Usage: /vmess username days\n\n"
+                message+="Example:\n"
+                message+="/vmess test123 30"
+                send_message "$chat_id" "$message"
+                return
+            elif [ ${#args[@]} -ne 2 ]; then
+                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /vmess username days\nExample: /vmess test123 30"
                 return 1
             fi
             create_vmess "$chat_id" "${args[0]}" "${args[1]}"
             ;;
         "/delete")
-            if [ ${#args[@]} -ne 1 ]; then
-                send_message "$chat_id" "Usage: /delete username"
+            if [ ${#args[@]} -eq 0 ]; then
+                message="🗑️ Delete User Account\n\n"
+                message+="Usage: /delete username\n\n"
+                message+="Example:\n"
+                message+="/delete test123"
+                send_message "$chat_id" "$message"
+                return
+            elif [ ${#args[@]} -ne 1 ]; then
+                send_message "$chat_id" "❌ Error: Wrong format\n\nUsage: /delete username\nExample: /delete test123"
                 return 1
             fi
             delete_user "$chat_id" "${args[0]}"
