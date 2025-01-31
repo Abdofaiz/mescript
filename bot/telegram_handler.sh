@@ -17,8 +17,11 @@ declare -A user_data
 # Function to send message
 send_message() {
     local chat_id=$1
-    local text=$2
-    curl -s -X POST "$API_URL/sendMessage" -d "chat_id=$chat_id" -d "text=$text" -d "parse_mode=HTML"
+    local message=$2
+    curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+        -d "chat_id=$chat_id" \
+        -d "text=$message" \
+        -d "parse_mode=HTML"
 }
 
 # Function to get server details
@@ -188,8 +191,7 @@ $server_details
 # Function to show welcome message
 show_welcome() {
     local chat_id=$1
-    send_message "$chat_id" "$(cat << 'EOF'
-⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
+    local welcome_msg="⚡ 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 ⚡
       𝙎𝙀𝙍𝙑𝙀𝙍 𝙋𝙍𝙀𝙈𝙄𝙐𝙈
 
     👋 𝙒𝙀𝙇𝘾𝙊𝙈𝙀 𝙏𝙊 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉
@@ -217,9 +219,9 @@ show_welcome() {
           🔌 /reboot
         𝙍𝙚𝙗𝙤𝙤𝙩 𝙎𝙚𝙧𝙫𝙚𝙧
 
-      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn
-EOF
-)"
+      💫 𝙎𝙪𝙥𝙥𝙤𝙧𝙩: @faizvpn"
+    
+    send_message "$chat_id" "$welcome_msg"
 }
 
 # Function to show help message
@@ -513,83 +515,56 @@ EOF
     unset user_data[$chat_id,protocol]
 }
 
-# Process messages
+# Function to process messages
 process_message() {
     local chat_id=$1
     local message=$2
     
-    # Get current state
-    local state=${user_states[$chat_id]:-"none"}
-    
-    case $state in
-        "none")
-            case $message in
-                "/start")
-                    show_welcome "$chat_id"
+    case "$message" in
+        "/start")
+            show_welcome "$chat_id"
+            ;;
+        "/vless")
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
+            user_states[$chat_id]="waiting_vless_username"
+            ;;
+        "/vmess")
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚:"
+            user_states[$chat_id]="waiting_vmess_username"
+            ;;
+        "/status")
+            check_server_status "$chat_id"
+            ;;
+        "/restart")
+            restart_services "$chat_id"
+            ;;
+        "/reboot")
+            reboot_server "$chat_id"
+            ;;
+        "/delete")
+            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+            user_states[$chat_id]="waiting_delete_username"
+            ;;
+        *)
+            # Handle username inputs based on state
+            local state=${user_states[$chat_id]:-"none"}
+            case $state in
+                "waiting_vless_username")
+                    create_vless_user "$chat_id" "$message"
+                    user_states[$chat_id]="none"
                     ;;
-                "/create")
-                    user_states[$chat_id]="waiting_username"
-                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧 :"
+                "waiting_vmess_username")
+                    create_vmess_user "$chat_id" "$message"
+                    user_states[$chat_id]="none"
                     ;;
-                "/vless")
-                    create_xray_user "$chat_id" "vless"
-                    ;;
-                "/vmess")
-                    create_xray_user "$chat_id" "vmess"
-                    ;;
-                "/status")
-                    check_server_status "$chat_id"
-                    ;;
-                "/server")
-                    server_status "$chat_id"
-                    ;;
-                "/restart")
-                    restart_services "$chat_id"
-                    ;;
-                "/reboot")
-                    reboot_server "$chat_id"
-                    ;;
-                "/help")
-                    show_help "$chat_id"
-                    ;;
-                "/delete")
-                    user_states[$chat_id]="waiting_delete_username"
-                    send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚 𝙩𝙤 𝙍𝙚𝙢𝙤𝙫𝙚:"
+                "waiting_delete_username")
+                    delete_user "$chat_id" "$message"
+                    user_states[$chat_id]="none"
                     ;;
                 *)
-                    send_message "$chat_id" "𝙐𝙨𝙚 /start 𝙩𝙤 𝙨𝙚𝙚 𝙖𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚 𝙘𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
+                    show_welcome "$chat_id"
                     ;;
             esac
-            ;;
-        "waiting_xray_username")
-            if [[ -n "$message" ]]; then
-                process_xray_creation "$chat_id" "$message"
-            else
-                send_message "$chat_id" "❌ Invalid username. Please try again."
-                user_states[$chat_id]="none"
-            fi
-            ;;
-        "waiting_username")
-            user_data[$chat_id,username]=$message
-            user_states[$chat_id]="waiting_password"
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝙋𝙖𝙨𝙨 :"
-            ;;
-        "waiting_password")
-            user_data[$chat_id,password]=$message
-            user_states[$chat_id]="waiting_duration"
-            send_message "$chat_id" "𝙎𝙚𝙣𝙙 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣 (𝘿𝙖𝙮𝙨) :"
-            ;;
-        "waiting_duration")
-            local username=${user_data[$chat_id,username]}
-            local password=${user_data[$chat_id,password]}
-            create_user "$chat_id" "$username" "$password" "$message"
-            user_states[$chat_id]="none"
-            unset user_data[$chat_id,username]
-            unset user_data[$chat_id,password]
-            ;;
-        "waiting_delete_username")
-            delete_user "$chat_id" "$message"
-            user_states[$chat_id]="none"
             ;;
     esac
 }
@@ -605,7 +580,10 @@ while true; do
         message=$(echo $update_data | jq -r '.message.text')
         update_id=$(echo $update_data | jq -r '.update_id')
         
-        process_message "$chat_id" "$message"
+        if [ -n "$message" ]; then
+            process_message "$chat_id" "$message"
+        fi
+        
         offset=$((update_id + 1))
     done
     
