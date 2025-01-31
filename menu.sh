@@ -1044,13 +1044,17 @@ get_system_info() {
     RAM_PERCENT=$(( (USED_RAM * 100) / TOTAL_RAM ))
     
     # Get domain if exists
-    DOMAIN=$(cat /etc/vps/domain 2>/dev/null || echo "Not Set")
+    DOMAIN=$(cat /etc/vps/domain.conf 2>/dev/null || echo "Not Set")
     
     # Get system uptime
     UPTIME=$(uptime -p | cut -d " " -f 2-)
 
     # Get install date
-    INSTALL_DATE=$(cat /etc/vps/install-date 2>/dev/null || echo "Not Available")
+    if [ -f "/etc/vps/install-date" ]; then
+        INSTALL_DATE=$(cat /etc/vps/install-date | cut -d: -f2 | xargs)
+    else
+        INSTALL_DATE="Not Available"
+    fi
 }
 
 # Main menu display

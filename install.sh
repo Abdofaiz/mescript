@@ -311,8 +311,11 @@ main_install() {
     systemctl restart squid
     systemctl restart xray
     
+    # Create VPS info directory if it doesn't exist
+    mkdir -p /etc/vps
+
     # Save installation date
-    date "+%Y-%m-%d" > /etc/vps/install-date
+    echo "Installation Date: $(date '+%Y-%m-%d')" > /etc/vps/install-date
     
     # Final setup
     echo -e "${GREEN}Installation completed!${NC}"
