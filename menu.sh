@@ -1131,17 +1131,71 @@ configure_telegram_bot() {
     configure_telegram_bot
 }
 
+# Function to install Telegram bot handler
+install_telegram_bot() {
+    clear
+    echo -e "${GREEN}=================================================${NC}"
+    echo -e "${YELLOW}         Installing Telegram Bot Handler         ${NC}"
+    echo -e "${GREEN}=================================================${NC}"
+    
+    # Create directories
+    mkdir -p /usr/local/bin
+    mkdir -p /etc/vps
+    
+    # Download and install telegram handler
+    echo -e "${YELLOW}Installing telegram handler...${NC}"
+    wget -O /usr/local/bin/telegram_handler.sh "https://raw.githubusercontent.com/Abdofaiz/mescript/main/bot/telegram_handler.sh"
+    chmod +x /usr/local/bin/telegram_handler.sh
+    
+    # Install dependencies
+    echo -e "${YELLOW}Installing required packages...${NC}"
+    apt-get update
+    apt-get install -y jq curl screen
+    
+    echo -e "${GREEN}Installation completed!${NC}"
+    echo -e "${YELLOW}Please configure your bot settings in the Telegram Bot Manager menu${NC}"
+    
+    read -n 1 -s -r -p "Press any key to continue"
+    manage_telegram_bot
+}
+
 # Function to manage Telegram bot
 manage_telegram_bot() {
     clear
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}            Telegram Bot Management              ${NC}"
     echo -e "${GREEN}=================================================${NC}"
+    
+    # Check if telegram handler is installed
+    if [ ! -f "/usr/local/bin/telegram_handler.sh" ]; then
+        echo -e "${RED}Telegram bot handler is not installed${NC}"
+        echo -e "${GREEN}1.${NC} Install Telegram Bot Handler"
+        echo -e "${GREEN}0.${NC} Back to Main Menu"
+        echo -e "${GREEN}=================================================${NC}"
+        read -p "Select option: " bot_option
+        
+        case $bot_option in
+            1)
+                install_telegram_bot
+                ;;
+            0)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                ;;
+        esac
+        read -n 1 -s -r -p "Press any key to continue"
+        manage_telegram_bot
+        return
+    fi
+    
     echo -e "${GREEN}1.${NC} Configure Bot Settings"
     echo -e "${GREEN}2.${NC} Add New User"
     echo -e "${GREEN}3.${NC} Remove User"
     echo -e "${GREEN}4.${NC} Check User Status"
     echo -e "${GREEN}5.${NC} Server Status"
+    echo -e "${GREEN}6.${NC} Reinstall Bot Handler"
     echo -e "${GREEN}0.${NC} Back to Main Menu"
     echo -e "${GREEN}=================================================${NC}"
     read -p "Select option: " bot_option
@@ -1151,20 +1205,43 @@ manage_telegram_bot() {
             configure_telegram_bot
             ;;
         2)
-            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
-            echo -e "Use command: /adduser username password duration"
+            if [ -f "/etc/vps/telegram.conf" ]; then
+                BOT_USERNAME=$(cat /etc/vps/telegram.conf | grep "BOT_USERNAME=" | cut -d= -f2)
+                echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+                echo -e "Use command: /adduser username password duration"
+            else
+                echo -e "${RED}Please configure bot settings first${NC}"
+            fi
             ;;
         3)
-            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
-            echo -e "Use command: /removeuser username"
+            if [ -f "/etc/vps/telegram.conf" ]; then
+                BOT_USERNAME=$(cat /etc/vps/telegram.conf | grep "BOT_USERNAME=" | cut -d= -f2)
+                echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+                echo -e "Use command: /removeuser username"
+            else
+                echo -e "${RED}Please configure bot settings first${NC}"
+            fi
             ;;
         4)
-            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
-            echo -e "Use command: /status username"
+            if [ -f "/etc/vps/telegram.conf" ]; then
+                BOT_USERNAME=$(cat /etc/vps/telegram.conf | grep "BOT_USERNAME=" | cut -d= -f2)
+                echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+                echo -e "Use command: /status username"
+            else
+                echo -e "${RED}Please configure bot settings first${NC}"
+            fi
             ;;
         5)
-            echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
-            echo -e "Use command: /server"
+            if [ -f "/etc/vps/telegram.conf" ]; then
+                BOT_USERNAME=$(cat /etc/vps/telegram.conf | grep "BOT_USERNAME=" | cut -d= -f2)
+                echo -e "${YELLOW}Visit Telegram Bot: @$BOT_USERNAME${NC}"
+                echo -e "Use command: /server"
+            else
+                echo -e "${RED}Please configure bot settings first${NC}"
+            fi
+            ;;
+        6)
+            install_telegram_bot
             ;;
         0)
             return
