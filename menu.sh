@@ -16,9 +16,6 @@ USER_DB="/etc/vps/users.db"
 # Add after color definitions
 ADMRufu="/etc/ADMRufu"
 
-# Add at the beginning of the script after color definitions
-SCRIPT_URL="https://raw.githubusercontent.com/Abdofaiz/mescript/main"
-
 # Create user database if it doesn't exist
 [ ! -f "$USER_DB" ] && touch "$USER_DB"
 
@@ -136,66 +133,25 @@ extend_ssh_ovpn() {
 # Function to check SSH & OpenVPN users
 check_ssh_ovpn() {
     clear
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "                 FAIZ-VPN USER STATUS"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-    # Filter out common service IPs and duplicates
-    EXCLUDE_IPS=(
-        "127.0.0.1"
-        "157.240."      # Facebook
-        "142.250."      # Google
-        "172.217."      # Google
-        "216.58."       # Google
-        "216.239."      # Google
-        "173.194."      # Google
-        "20.33."        # Microsoft
-        "20.47."        # Microsoft
-        "149.154."      # Telegram
-        "209.85."       # Google
-        "144.208."      # Other services
-        "142.251."      # Google
-        "47.241."       # Alibaba
-    )
-
-    # Create exclude pattern
-    EXCLUDE_PATTERN=$(printf "|%s" "${EXCLUDE_IPS[@]}")
-    EXCLUDE_PATTERN=${EXCLUDE_PATTERN:1}
-
-    # Show active connections summary
-    echo -e "\n${YELLOW}Active Users Summary:${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    printf "%-15s %-15s %-15s %-15s %-15s\n" "Username" "SSH/SSL" "Dropbear" "Total" "Expiry"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
+    echo -e "${GREEN}=== SSH & OpenVPN User Status ===${NC}"
+    echo -e "\nOnline Users:"
+    echo -e "${YELLOW}"
+    who | grep -v "root"
+    echo -e "${NC}"
+    echo -e "\nUser List:"
+    echo -e "Username | Expiry Date | Status"
+    echo -e "--------------------------------"
     while IFS=: read -r type username _ expiry; do
         if [[ "$type" == "ssh" ]]; then
-            # Get unique real client IPs
-            client_ips=($(netstat -natp | grep 'ESTABLISHED.*sshd\|ESTABLISHED.*stunnel' | grep -w "$username" | \
-                         grep -vE "$EXCLUDE_PATTERN" | awk '{print $5}' | cut -d: -f1 | sort -u))
-            ssh_count=${#client_ips[@]}
-            
-            db_ips=($(netstat -natp | grep 'ESTABLISHED.*dropbear' | grep -w "$username" | \
-                     grep -vE "$EXCLUDE_PATTERN" | awk '{print $5}' | cut -d: -f1 | sort -u))
-            db_count=${#db_ips[@]}
-            
-            total=$((ssh_count + db_count))
-            
-            # Show all users, even those without connections
-            status=""
             if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
-                status="${GREEN}$expiry${NC}"
+                status="${GREEN}Active${NC}"
             else
                 status="${RED}Expired${NC}"
             fi
-            
-            printf "%-15s %-15s %-15s %-15s %-15s\n" "$username" "$ssh_count" "$db_count" "$total" "$status"
+            echo -e "$username | $expiry | $status"
         fi
     done < $USER_DB
-
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "\n${YELLOW}Support: @faizvpn${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
     read -n 1 -s -r -p "Press any key to continue"
 }
 
@@ -976,66 +932,10 @@ check_service_status() {
 install_badvpn() {
     if [ ! -f "/usr/bin/badvpn-udpgw" ]; then
         echo -e "${YELLOW}Installing BadVPN...${NC}"
-        
-        # Install dependencies
-        apt-get update
-        apt-get install -y cmake make gcc build-essential
-        
-        # Create directory and download source
-        mkdir -p /tmp/badvpn
-        cd /tmp/badvpn
-        
-        # Download and extract BadVPN source
-        wget -O badvpn.zip "https://github.com/ambrop72/badvpn/archive/refs/heads/master.zip"
-        unzip badvpn.zip
-        cd badvpn-master
-        
-        # Compile and install
-        cmake . -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
-        make install
-        
-        # Create systemd service
-        cat > /etc/systemd/system/badvpn.service << EOF
-[Unit]
-Description=BadVPN UDPGW Service
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/local/bin/badvpn-udpgw --listen-addr 127.0.0.1:7300 --max-clients 1000 --max-connections-for-client 100
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-        # Reload systemd and enable service
-        systemctl daemon-reload
-        systemctl enable badvpn
-        systemctl start badvpn
-        
-        # Cleanup
-        cd ~
-        rm -rf /tmp/badvpn
-        
-        echo -e "${GREEN}BadVPN installed successfully${NC}"
-    else
-        echo -e "${YELLOW}BadVPN is already installed${NC}"
-    fi
-}
-
-# Function to install BadVPN (Alternative Method)
-install_badvpn_alt() {
-    if [ ! -f "/usr/bin/badvpn-udpgw" ]; then
-        echo -e "${YELLOW}Installing BadVPN (Alternative Method)...${NC}"
-        
-        # Download pre-compiled binary
         wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/Abdofaiz/mescript/main/badvpn-udpgw64"
         chmod +x /usr/bin/badvpn-udpgw
         
-        # Create systemd service
+        # Create systemd service file
         cat > /etc/systemd/system/badvpn.service << EOF
 [Unit]
 Description=BadVPN UDPGW Service
@@ -1051,12 +951,10 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-
-        # Reload systemd and enable service
+        
         systemctl daemon-reload
         systemctl enable badvpn
         systemctl start badvpn
-        
         echo -e "${GREEN}BadVPN installed successfully${NC}"
     else
         echo -e "${YELLOW}BadVPN is already installed${NC}"
@@ -1069,12 +967,11 @@ manage_badvpn() {
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${YELLOW}              BadVPN Management                  ${NC}"
     echo -e "${GREEN}=================================================${NC}"
-    echo -e "${GREEN}1.${NC} Install BadVPN (Compile from source)"
-    echo -e "${GREEN}2.${NC} Install BadVPN (Pre-compiled binary)"
-    echo -e "${GREEN}3.${NC} Start BadVPN"
-    echo -e "${GREEN}4.${NC} Stop BadVPN"
-    echo -e "${GREEN}5.${NC} Restart BadVPN"
-    echo -e "${GREEN}6.${NC} Check BadVPN Status"
+    echo -e "${GREEN}1.${NC} Install BadVPN"
+    echo -e "${GREEN}2.${NC} Start BadVPN"
+    echo -e "${GREEN}3.${NC} Stop BadVPN"
+    echo -e "${GREEN}4.${NC} Restart BadVPN"
+    echo -e "${GREEN}5.${NC} Check BadVPN Status"
     echo -e "${GREEN}0.${NC} Back to Main Menu"
     echo -e "${GREEN}=================================================${NC}"
     read -p "Select option: " badvpn_option
@@ -1084,26 +981,21 @@ manage_badvpn() {
             install_badvpn
             ;;
         2)
-            install_badvpn_alt
-            ;;
-        3)
             systemctl start badvpn
             echo -e "${GREEN}BadVPN started${NC}"
             ;;
-        4)
+        3)
             systemctl stop badvpn
             echo -e "${YELLOW}BadVPN stopped${NC}"
             ;;
-        5)
+        4)
             systemctl restart badvpn
             echo -e "${GREEN}BadVPN restarted${NC}"
             ;;
-        6)
+        5)
             if systemctl is-active --quiet badvpn; then
                 echo -e "${GREEN}BadVPN is running${NC}"
                 echo -e "Port: 7300"
-                echo -e "Status: $(systemctl status badvpn | grep Active)"
-                echo -e "Memory usage: $(ps aux | grep badvpn | grep -v grep | awk '{print $6/1024 "MB"}')"
             else
                 echo -e "${RED}BadVPN is not running${NC}"
             fi
@@ -1362,239 +1254,6 @@ manage_telegram_bot() {
     manage_telegram_bot
 }
 
-# Function to reinstall script
-reinstall_script() {
-    clear
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "            🚀 𝙁𝘼𝙄𝙕-𝙑𝙋𝙉 𝙍𝙀𝙄𝙉𝙎𝙏𝘼𝙇𝙇"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e ""
-    echo -e "${YELLOW}This will reinstall all script components:${NC}"
-    echo -e " • SSH & OpenVPN"
-    echo -e " • Stunnel4"
-    echo -e " • Dropbear"
-    echo -e " • Squid Proxy"
-    echo -e " • BadVPN UDP"
-    echo -e " • Xray"
-    echo -e " • Websocket"
-    echo -e ""
-    echo -e "${RED}Warning: All current settings will be backed up${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    read -p "Do you want to continue? [y/N]: " confirm
-
-    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-        # Backup current configs
-        echo -e "\n${YELLOW}Backing up current configurations...${NC}"
-        mkdir -p /etc/vps/backup
-        cp /etc/vps/*.conf /etc/vps/backup/ 2>/dev/null
-        cp /etc/vps/*.db /etc/vps/backup/ 2>/dev/null
-        
-        # Download and run installer
-        echo -e "\n${YELLOW}Downloading latest installer...${NC}"
-        wget -O install.sh "${SCRIPT_URL}/install.sh"
-        chmod +x install.sh
-        
-        echo -e "\n${YELLOW}Starting reinstallation...${NC}"
-        ./install.sh
-        
-        # Restore configs
-        echo -e "\n${YELLOW}Restoring configurations...${NC}"
-        cp /etc/vps/backup/* /etc/vps/ 2>/dev/null
-        
-        echo -e "\n${GREEN}Reinstallation completed!${NC}"
-        echo -e "Your previous settings have been restored."
-        echo -e "\n${YELLOW}Please reboot your VPS to apply all changes${NC}"
-        read -p "Reboot now? [y/N]: " reboot
-        if [[ "$reboot" == "y" || "$reboot" == "Y" ]]; then
-            reboot
-        fi
-    else
-        echo -e "\n${YELLOW}Reinstallation cancelled${NC}"
-    fi
-    
-    read -n 1 -s -r -p "Press any key to continue"
-}
-
-# Function to fix Stunnel4 configuration
-fix_stunnel() {
-    clear
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "                Fix Stunnel4 Service"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-    # Install stunnel if not installed
-    apt-get install -y stunnel4
-
-    # Stop the service first
-    systemctl stop stunnel4
-
-    # Create proper stunnel config directory if it doesn't exist
-    mkdir -p /etc/stunnel
-
-    # Create proper stunnel config with improved settings
-    cat > /etc/stunnel/stunnel.conf <<EOF
-pid = /var/run/stunnel4.pid
-cert = /etc/stunnel/stunnel.pem
-client = no
-socket = l:TCP_NODELAY=1
-socket = r:TCP_NODELAY=1
-TIMEOUTclose = 0
-debug = 7
-sslVersion = all
-ciphers = ALL:!ADH:!LOW:!SSLv2:!SSLv3:!MD5:!RC4
-options = NO_SSLv2
-options = NO_SSLv3
-
-[dropbear]
-accept = 443
-connect = 127.0.0.1:109
-TIMEOUTidle = 300
-
-[openssh]
-accept = 777
-connect = 127.0.0.1:22
-TIMEOUTidle = 300
-
-[openssh80]
-accept = 80
-connect = 127.0.0.1:22
-TIMEOUTidle = 300
-
-[openvpn]
-accept = 442
-connect = 127.0.0.1:1194
-TIMEOUTidle = 300
-EOF
-
-    # Create SSL certificate with proper settings
-    echo -e "\n${YELLOW}Creating new SSL Certificate...${NC}"
-    openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 \
-        -keyout /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt \
-        -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=$(curl -s ipv4.icanhazip.com)"
-    
-    cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
-
-    # Fix permissions
-    chmod 600 /etc/stunnel/stunnel.pem
-    
-    # Enable stunnel in default config
-    echo "ENABLED=1" > /etc/default/stunnel4
-
-    # Create systemd service file with proper settings
-    cat > /etc/systemd/system/stunnel4.service <<EOF
-[Unit]
-Description=SSL tunnel for network daemons
-After=network.target
-After=syslog.target
-
-[Service]
-Type=forking
-ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
-ExecStop=/usr/bin/pkill stunnel4
-TimeoutSec=600
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Fix common network issues
-    sysctl -w net.ipv4.tcp_timestamps=1
-    sysctl -w net.ipv4.tcp_window_scaling=1
-    sysctl -w net.ipv4.tcp_sack=1
-    sysctl -w net.ipv4.tcp_fin_timeout=30
-    sysctl -w net.ipv4.tcp_keepalive_time=60
-    sysctl -w net.ipv4.tcp_max_syn_backlog=4096
-
-    # Reload systemd and restart stunnel
-    systemctl daemon-reload
-    systemctl enable stunnel4
-    systemctl restart stunnel4
-
-    # Check if service is running
-    if systemctl is-active --quiet stunnel4; then
-        echo -e "\n${GREEN}Stunnel4 service has been fixed and is running!${NC}"
-        echo -e "\n${YELLOW}Port Information:${NC}"
-        echo -e "• SSL/TLS Dropbear : 443"
-        echo -e "• SSL/TLS OpenSSH  : 777"
-        echo -e "• SSL/TLS OpenSSH  : 80"
-        echo -e "• SSL/TLS OpenVPN  : 442"
-        
-        # Show connection status
-        echo -e "\n${YELLOW}Service Status:${NC}"
-        echo -e "• Stunnel4: $(systemctl is-active stunnel4)"
-        echo -e "• Dropbear: $(systemctl is-active dropbear)"
-        echo -e "• OpenSSH: $(systemctl is-active ssh)"
-        
-        # Show listening ports
-        echo -e "\n${YELLOW}Listening Ports:${NC}"
-        netstat -tulpn | grep -E 'stunnel|dropbear|sshd'
-    else
-        echo -e "\n${RED}Failed to start Stunnel4. Checking logs...${NC}"
-        journalctl -u stunnel4 --no-pager | tail -n 10
-    fi
-}
-
-# Update the fix_ssh_config function
-fix_ssh_config() {
-    clear
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "            Fix SSH Connection Issues"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-    # Backup original config
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
-
-    # Update SSH configuration with better keepalive settings
-    cat > /etc/ssh/sshd_config <<EOF
-Port 22
-Protocol 2
-HostKey /etc/ssh/ssh_host_rsa_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-HostKey /etc/ssh/ssh_host_ed25519_key
-UsePAM yes
-ClientAliveInterval 30
-ClientAliveCountMax 6
-TCPKeepAlive yes
-MaxAuthTries 10
-PubkeyAuthentication yes
-PermitRootLogin yes
-PasswordAuthentication yes
-ChallengeResponseAuthentication no
-KerberosAuthentication no
-GSSAPIAuthentication no
-X11Forwarding yes
-PrintMotd no
-AcceptEnv LANG LC_*
-Subsystem sftp /usr/lib/openssh/sftp-server
-UseDNS no
-AddressFamily inet
-EOF
-
-    # Restart SSH service
-    systemctl restart ssh
-
-    # Update system TCP keepalive settings
-    cat > /etc/sysctl.d/99-sysctl.conf <<EOF
-net.ipv4.tcp_keepalive_time = 60
-net.ipv4.tcp_keepalive_intvl = 10
-net.ipv4.tcp_keepalive_probes = 6
-net.ipv4.ip_local_port_range = 1024 65535
-net.ipv4.tcp_rfc1337 = 1
-net.ipv4.tcp_fin_timeout = 15
-net.ipv4.tcp_max_syn_backlog = 4096
-EOF
-
-    sysctl -p /etc/sysctl.d/99-sysctl.conf
-
-    echo -e "\n${GREEN}SSH configuration has been updated!${NC}"
-    echo -e "• ClientAliveInterval: 30 seconds"
-    echo -e "• ClientAliveCountMax: 6"
-    echo -e "• TCPKeepAlive: enabled"
-    echo -e "• System TCP keepalive settings optimized"
-}
-
 # Main menu display
 show_main_menu() {
     clear
@@ -1620,8 +1279,7 @@ show_main_menu() {
     echo -e "${GREEN}6.${NC} Service Status"
     echo -e "${GREEN}7.${NC} BadVPN Manager"
     echo -e "${GREEN}8.${NC} Telegram Bot Manager"
-    echo -e "${GREEN}9.${NC} Reinstall VPS Script"
-    echo -e "${RED}10.${NC} Uninstall VPS Script"
+    echo -e "${RED}9.${NC} Uninstall All Services"
     echo -e "${GREEN}0.${NC} Exit"
     echo -e "${GREEN}=================================================${NC}"
     echo -e "${GREEN}║            ${YELLOW}Telegram: @faizvpn               ${GREEN}║${NC}"
@@ -1782,15 +1440,10 @@ while true; do
             ;;
         5)
             clear
-            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            echo -e "              🛠️ 𝙎𝙮𝙨𝙩𝙚𝙢 𝙎𝙚𝙩𝙩𝙞𝙣𝙜𝙨"
-            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "${GREEN}=== System Settings ===${NC}"
             echo -e "${GREEN}1.${NC} Add/Change Domain"
             echo -e "${GREEN}2.${NC} Change Port Services"
-            echo -e "${GREEN}3.${NC} Fix Stunnel4 Service"
-            echo -e "${GREEN}4.${NC} Fix SSH Config"
             echo -e "${GREEN}0.${NC} Back to main menu"
-            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
             read -p "Select option: " settings_option
 
             case $settings_option in
@@ -1800,14 +1453,6 @@ while true; do
                     ;;
                 2)
                     change_ports
-                    press_enter
-                    ;;
-                3)
-                    fix_stunnel
-                    press_enter
-                    ;;
-                4)
-                    fix_ssh_config
                     press_enter
                     ;;
                 0)
@@ -1829,9 +1474,6 @@ while true; do
             manage_telegram_bot
             ;;
         9)
-            reinstall_script
-            ;;
-        10)
             echo -e "${RED}Warning: This will uninstall all VPS services${NC}"
             read -p "Are you sure you want to continue? (y/n): " confirm
             if [[ $confirm == "y" || $confirm == "Y" ]]; then
