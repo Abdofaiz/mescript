@@ -154,16 +154,18 @@ check_ssh_ovpn() {
         "149.154."      # Telegram
         "209.85."       # Google
         "144.208."      # Other services
+        "142.251."      # Google
+        "47.241."       # Alibaba
     )
 
     # Create exclude pattern
     EXCLUDE_PATTERN=$(printf "|%s" "${EXCLUDE_IPS[@]}")
     EXCLUDE_PATTERN=${EXCLUDE_PATTERN:1}
 
-    # First show active connections summary
+    # Show active connections summary
     echo -e "\n${YELLOW}Active Users Summary:${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    printf "%-15s %-15s %-15s %-15s\n" "Username" "SSH/SSL" "Dropbear" "Total"
+    printf "%-15s %-15s %-15s %-15s %-15s\n" "Username" "SSH/SSL" "Dropbear" "Total" "Expiry"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     while IFS=: read -r type username _ expiry; do
@@ -179,57 +181,19 @@ check_ssh_ovpn() {
             
             total=$((ssh_count + db_count))
             
-            if [ $total -gt 0 ]; then
-                printf "%-15s %-15s %-15s %-15s\n" "$username" "$ssh_count" "$db_count" "$total"
+            # Show all users, even those without connections
+            status=""
+            if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
+                status="${GREEN}$expiry${NC}"
+            else
+                status="${RED}Expired${NC}"
             fi
-        fi
-    done < $USER_DB
-    
-    # Then show detailed connection information
-    echo -e "\n${YELLOW}Detailed Connection Info:${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-    while IFS=: read -r type username _ expiry; do
-        if [[ "$type" == "ssh" ]]; then
-            # Get unique client IPs
-            client_ips=($(netstat -natp | grep 'ESTABLISHED.*\(sshd\|stunnel\|dropbear\)' | grep -w "$username" | \
-                         grep -vE "$EXCLUDE_PATTERN" | awk '{print $5}' | cut -d: -f1 | sort -u))
-            total=${#client_ips[@]}
             
-            if [ $total -gt 0 ]; then
-                echo -e "\n${GREEN}User: $username${NC}"
-                echo -e "Expiry: $expiry"
-                if [[ $(date -d "$expiry" +%s) -gt $(date +%s) ]]; then
-                    echo -e "Status: ${GREEN}Active${NC}"
-                else
-                    echo -e "Status: ${RED}Expired${NC}"
-                fi
-                
-                echo -e "\n${YELLOW}Active Connections:${NC}"
-                for ip in "${client_ips[@]}"; do
-                    conn_info=$(netstat -natp | grep 'ESTABLISHED.*\(sshd\|stunnel\|dropbear\)' | grep -w "$username" | grep "$ip" | head -1)
-                    port=$(echo "$conn_info" | awk '{print $5}' | cut -d: -f2)
-                    pid=$(echo "$conn_info" | awk '{print $7}' | cut -d/ -f1)
-                    duration=$(ps -p $pid -o etime= 2>/dev/null || echo "N/A")
-                    conn_type=""
-                    if echo "$conn_info" | grep -q "sshd\|stunnel"; then
-                        conn_type="SSH/SSL"
-                    elif echo "$conn_info" | grep -q "dropbear"; then
-                        conn_type="Dropbear"
-                    fi
-                    echo -e "   > IP: $ip"
-                    echo -e "      Type: $conn_type"
-                    echo -e "      Port: $port"
-                    echo -e "      Duration: $duration"
-                done
-                
-                echo -e "\n${YELLOW}Connection Summary:${NC}"
-                echo -e "   • Total Unique IPs: $total"
-                echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            fi
+            printf "%-15s %-15s %-15s %-15s %-15s\n" "$username" "$ssh_count" "$db_count" "$total" "$status"
         fi
     done < $USER_DB
 
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "\n${YELLOW}Support: @faizvpn${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     read -n 1 -s -r -p "Press any key to continue"
