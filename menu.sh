@@ -1437,6 +1437,98 @@ reinstall_script() {
     read -n 1 -s -r -p "Press any key to continue"
 }
 
+# Function to fix Stunnel4 configuration
+fix_stunnel() {
+    clear
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "                Fix Stunnel4 Service"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    echo -e "${YELLOW}Fixing Stunnel4 configuration...${NC}"
+    
+    # Stop the service first
+    systemctl stop stunnel4
+
+    # Create proper stunnel config directory if it doesn't exist
+    mkdir -p /etc/stunnel
+    
+    # Create proper stunnel config
+    cat > /etc/stunnel/stunnel.conf <<EOF
+pid = /var/run/stunnel4.pid
+cert = /etc/stunnel/stunnel.pem
+client = no
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+TIMEOUTclose = 0
+
+[dropbear]
+accept = 443
+connect = 127.0.0.1:109
+
+[openssh]
+accept = 777
+connect = 127.0.0.1:22
+
+[openvpn]
+accept = 442
+connect = 127.0.0.1:1194
+EOF
+
+    # Create SSL certificate if it doesn't exist
+    if [ ! -f "/etc/stunnel/stunnel.pem" ]; then
+        echo -e "\n${YELLOW}Creating new SSL Certificate...${NC}"
+        openssl genrsa -out /etc/stunnel/stunnel.key 2048
+        openssl req -new -key /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.csr -subj "/C=US/ST=California/L=Los Angeles/O=FAIZ-VPN/OU=FAIZ-VPN/CN=FAIZ-VPN"
+        openssl x509 -req -days 3650 -in /etc/stunnel/stunnel.csr -signkey /etc/stunnel/stunnel.key -out /etc/stunnel/stunnel.crt
+        cat /etc/stunnel/stunnel.key /etc/stunnel/stunnel.crt > /etc/stunnel/stunnel.pem
+    fi
+
+    # Fix permissions
+    chmod 600 /etc/stunnel/stunnel.pem
+    
+    # Enable stunnel in default config
+    echo -e "\n${YELLOW}Enabling Stunnel4 service...${NC}"
+    sed -i 's/ENABLED=0/ENABLED=1/' /etc/default/stunnel4
+
+    # Create systemd service file
+    cat > /etc/systemd/system/stunnel4.service <<EOF
+[Unit]
+Description=SSL tunnel for network daemons
+After=network.target
+After=syslog.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/stunnel4 /etc/stunnel/stunnel.conf
+ExecStop=/usr/bin/pkill stunnel4
+TimeoutSec=600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Reload systemd and restart stunnel
+    echo -e "\n${YELLOW}Restarting Stunnel4 service...${NC}"
+    systemctl daemon-reload
+    systemctl enable stunnel4
+    systemctl restart stunnel4
+    
+    # Check if service is running
+    if systemctl is-active --quiet stunnel4; then
+        echo -e "\n${GREEN}Stunnel4 service has been fixed and is running!${NC}"
+        echo -e "\n${YELLOW}Port Information:${NC}"
+        echo -e "• SSL/TLS Dropbear : 443"
+        echo -e "• SSL/TLS OpenSSH  : 777"
+        echo -e "• SSL/TLS OpenVPN  : 442"
+    else
+        echo -e "\n${RED}Failed to start Stunnel4. Checking logs...${NC}"
+        journalctl -u stunnel4 --no-pager | tail -n 10
+    fi
+    
+    echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    read -n 1 -s -r -p "Press any key to continue"
+}
+
 # Main menu display
 show_main_menu() {
     clear
